@@ -14,6 +14,15 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
 
+    public List<UsuarioDTO> obtenerMisHijos(String rutApoderado) {
+        var apoderado = usuarioRepository.findByRut(rutApoderado)
+                .orElseThrow(() -> new IllegalArgumentException("Apoderado no encontrado"));
+        return usuarioRepository.findByApoderado(apoderado.getId())
+                .stream()
+                .map(UsuarioDTO::from)
+                .toList();
+    }
+
     public List<UsuarioDTO> listarTodos() {
         return usuarioRepository.findAll()
                 .stream()

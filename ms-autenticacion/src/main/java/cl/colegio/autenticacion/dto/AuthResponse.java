@@ -10,7 +10,8 @@ public record AuthResponse(
         String nombre,
         String apellido,
         String email,
-        Rol rol
+        Rol rol,
+        String idApoderado
 ) {
     public AuthResponse(String token, cl.colegio.autenticacion.entity.Usuario usuario) {
         this(
@@ -21,7 +22,8 @@ public record AuthResponse(
                 usuario.getNombre(),
                 usuario.getApellido(),
                 usuario.getEmail(),
-                usuario.getRol()
+                usuario.getRol(),
+                usuario.getIdApoderado()
         );
     }
 }

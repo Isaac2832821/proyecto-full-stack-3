@@ -76,6 +76,18 @@ public class UsuarioRepository {
         }
     }
 
+    public List<Usuario> findByApoderado(String idApoderado) {
+        try {
+            List<QueryDocumentSnapshot> docs = getCollection()
+                    .whereEqualTo("idApoderado", idApoderado)
+                    .get().get().getDocuments();
+            return docs.stream().map(this::fromDoc).toList();
+        } catch (InterruptedException | ExecutionException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error al buscar hijos del apoderado", e);
+        }
+    }
+
     // ── Internos ─────────────────────────────────────────────────────────────
 
     private CollectionReference getCollection() {
@@ -105,6 +117,7 @@ public class UsuarioRepository {
         map.put("email", u.getEmail());
         map.put("password", u.getPassword());
         map.put("rol", u.getRol().name());
+        map.put("idApoderado", u.getIdApoderado());
         map.put("activo", u.isActivo());
         return map;
     }
@@ -121,6 +134,7 @@ public class UsuarioRepository {
                 .email(doc.getString("email"))
                 .password(doc.getString("password"))
                 .rol(Rol.valueOf(doc.getString("rol")))
+                .idApoderado(doc.getString("idApoderado"))
                 .activo(Boolean.TRUE.equals(doc.getBoolean("activo")))
                 .build();
     }

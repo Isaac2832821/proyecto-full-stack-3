@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
                         // ── Gestión de usuarios: solo ADMIN ─────────────────
+                        .requestMatchers("/usuarios/mis-hijos").hasRole("APODERADO")
                         .requestMatchers("/usuarios/**").hasRole("ADMIN")
                         // ── Todo lo demás requiere autenticación ─────────────
                         .anyRequest().authenticated()

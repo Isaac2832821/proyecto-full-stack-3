@@ -8,9 +8,10 @@ public record UsuarioDTO(
         String nombre,
         String apellido,
         String email,
-        Rol rol
+        Rol rol,
+        String idApoderado
 ) {
     public static UsuarioDTO from(cl.colegio.autenticacion.entity.Usuario u) {
-        return new UsuarioDTO(u.getId(), u.getRut(), u.getNombre(), u.getApellido(), u.getEmail(), u.getRol());
+        return new UsuarioDTO(u.getId(), u.getRut(), u.getNombre(), u.getApellido(), u.getEmail(), u.getRol(), u.getIdApoderado());
     }
 }

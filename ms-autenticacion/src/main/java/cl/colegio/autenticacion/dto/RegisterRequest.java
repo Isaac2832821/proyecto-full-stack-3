@@ -21,5 +21,7 @@ public record RegisterRequest(
         String password,
 
         @NotNull(message = "El rol es obligatorio")
-        Rol rol
+        Rol rol,
+
+        String idApoderado // Opcional, solo usado si rol es ESTUDIANTE
 ) {}

@@ -146,7 +146,6 @@ function renderRegister(container) {
           <div class="form-group">
             <label for="reg-rol" style="display:block; font-size:0.8125rem; font-weight:500; color:var(--text-muted); margin-bottom:0.375rem;">Rol</label>
             <select id="reg-rol" required style="width:100%; padding:0.75rem 1rem; background:var(--bg-input); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font); outline:none; margin-bottom:1.25rem;">
-              <option value="ESTUDIANTE">Estudiante</option>
               <option value="DOCENTE">Docente</option>
               <option value="APODERADO">Apoderado</option>
             </select>
@@ -218,7 +217,7 @@ async function handleRegister(e) {
        msg = err.data.error;
     }
     
-    alertBox.innerHTML = `<div class="alert alert-error">\${msg}</div>`;
+    alertBox.innerHTML = `<div class="alert alert-error">${msg}</div>`;
     btn.disabled = false;
     btn.textContent = 'Registrarse';
   }
@@ -263,6 +262,7 @@ function renderDashboard(container) {
           </div>
         </div>
         ${rol === 'ADMIN' ? renderAdminSection() : ''}
+        ${rol === 'APODERADO' ? renderApoderadoSection() : ''}
       </main>
     </div>
   `;
@@ -271,6 +271,10 @@ function renderDashboard(container) {
 
   if (rol === 'ADMIN') {
     loadUsuarios();
+  }
+  if (rol === 'APODERADO') {
+    loadHijos();
+    document.getElementById('add-hijo-form').addEventListener('submit', handleAddHijo);
   }
 }
 
@@ -319,6 +323,109 @@ async function loadUsuarios() {
     `;
   } catch (err) {
     container.innerHTML = `<div class="alert alert-error">Error al cargar usuarios</div>`;
+  }
+}
+
+// ── Dashboard Apoderado ──────────────────────────────────────────────────
+
+function renderApoderadoSection() {
+  return `
+    <section style="margin-top:2rem;">
+      <h3 style="font-size:1.25rem; font-weight:600; margin-bottom:1rem;">👼 Estudiantes a cargo</h3>
+      
+      <div style="display:flex; flex-wrap:wrap; gap: 2rem;">
+        <div style="flex:1; min-width: 300px;">
+          <div id="hijos-list" style="color:var(--text-muted);">Cargando estudiantes...</div>
+        </div>
+        
+        <div style="flex:1; min-width: 300px; background: var(--bg-input); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow);">
+          <h4 style="margin-bottom: 1rem; font-size:1.1rem; color: var(--primary-light);">➕ Matricular Nuevo Estudiante</h4>
+          <div id="add-hijo-alert"></div>
+          <form id="add-hijo-form">
+            <input type="text" id="h-nombre" placeholder="Nombre" required style="width:100%; padding:0.75rem; margin-bottom:0.75rem; border-radius:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); outline:none;"/>
+            <input type="text" id="h-apellido" placeholder="Apellido" required style="width:100%; padding:0.75rem; margin-bottom:0.75rem; border-radius:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); outline:none;"/>
+            <input type="text" id="h-rut" placeholder="RUT (ej: 9999999-9)" required style="width:100%; padding:0.75rem; margin-bottom:0.75rem; border-radius:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); outline:none;"/>
+            <input type="email" id="h-email" placeholder="Email" required style="width:100%; padding:0.75rem; margin-bottom:0.75rem; border-radius:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); outline:none;"/>
+            <input type="password" id="h-password" placeholder="Contraseña provisoria" required style="width:100%; padding:0.75rem; margin-bottom:1.25rem; border-radius:6px; background:var(--bg); color:var(--text); border:1px solid var(--border); outline:none;"/>
+            <button type="submit" class="btn btn-primary" id="btn-add-hijo" style="padding: 0.75rem 1rem;">Matricular Estudiante</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+async function loadHijos() {
+  const container = document.getElementById('hijos-list');
+  try {
+    const hijos = await api('/usuarios/mis-hijos');
+    if (!hijos.length) {
+      container.innerHTML = '<div class="alert alert-error" style="background:rgba(255,255,255,0.05); color:var(--text-muted); border-color:var(--border);">Aún no tienes estudiantes registrados a tu cargo. Usa el formulario de la derecha para matricularlos.</div>';
+      return;
+    }
+    container.innerHTML = `
+      <div style="display:grid; gap:1rem;">
+        ${hijos.map(h => `
+          <div style="background:var(--bg-card); padding:1rem; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:1.25rem; transition:var(--transition);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <div style="font-size: 2.2rem; filter: drop-shadow(0 2px 4px rgba(37,99,235,0.3));">🎓</div>
+            <div>
+              <div style="font-weight:600; font-size:1.1rem; color:var(--primary-light);">${h.nombre} ${h.apellido}</div>
+              <div style="font-size:0.875rem; color:var(--text-muted); margin-top:0.25rem;">RUT: ${h.rut} | Email: ${h.email}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div class="alert alert-error">Error al cargar estudiantes</div>`;
+  }
+}
+
+async function handleAddHijo(e) {
+  e.preventDefault();
+  const alertBox = document.getElementById('add-hijo-alert');
+  const btn = document.getElementById('btn-add-hijo');
+
+  const payload = {
+    nombre: document.getElementById('h-nombre').value.trim(),
+    apellido: document.getElementById('h-apellido').value.trim(),
+    rut: document.getElementById('h-rut').value.trim(),
+    email: document.getElementById('h-email').value.trim(),
+    rol: 'ESTUDIANTE',
+    password: document.getElementById('h-password').value,
+    idApoderado: state.user.id
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'Matriculando...';
+  alertBox.innerHTML = '';
+
+  try {
+    await fetch(API_BASE + '/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(async r => {
+       const j = await r.json();
+       if(!r.ok) throw {data: j};
+       return j;
+    });
+    
+    document.getElementById('add-hijo-form').reset();
+    alertBox.innerHTML = `<div class="alert alert-success">¡Estudiante matriculado y asignado a tu cuenta con éxito!</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Matricular Estudiante';
+    loadHijos();
+  } catch (err) {
+    let msg = 'Error al registrar';
+    if (err?.data?.errores) {
+       msg = Object.values(err.data.errores).join('<br>');
+    } else if (err?.data?.error) {
+       msg = err.data.error;
+    }
+    alertBox.innerHTML = `<div class="alert alert-error">${msg}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Matricular Estudiante';
   }
 }
 

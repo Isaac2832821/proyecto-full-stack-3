@@ -27,6 +27,8 @@ public class Usuario {
 
     private Rol rol;
 
+    private String idApoderado; // ID del creador (APODERADO)
+
     @Builder.Default
     private boolean activo = true;
 }

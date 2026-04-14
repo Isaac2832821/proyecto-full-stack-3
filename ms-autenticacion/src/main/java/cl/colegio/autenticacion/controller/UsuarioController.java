@@ -30,6 +30,13 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.listarTodos());
     }
 
+    @Operation(summary = "Apoderado: Ver estudiantes a cargo")
+    @GetMapping("/mis-hijos")
+    @PreAuthorize("hasRole('APODERADO')")
+    public ResponseEntity<List<UsuarioDTO>> obtenerMisHijos(java.security.Principal principal) {
+        return ResponseEntity.ok(usuarioService.obtenerMisHijos(principal.getName()));
+    }
+
     @Operation(summary = "Obtener usuario por ID")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")

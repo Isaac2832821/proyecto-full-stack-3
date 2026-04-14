@@ -37,6 +37,7 @@ public class AuthService {
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
                 .rol(request.rol())
+                .idApoderado(request.idApoderado())
                 .activo(true)
                 .build();
 
