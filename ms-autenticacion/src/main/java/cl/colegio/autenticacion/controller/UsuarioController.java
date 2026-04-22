@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
+
 import java.util.List;
 
 @RestController
@@ -33,7 +35,7 @@ public class UsuarioController {
     @Operation(summary = "Apoderado: Ver estudiantes a cargo")
     @GetMapping("/mis-hijos")
     @PreAuthorize("hasRole('APODERADO')")
-    public ResponseEntity<List<UsuarioDTO>> obtenerMisHijos(java.security.Principal principal) {
+    public ResponseEntity<List<UsuarioDTO>> obtenerMisHijos(Principal principal) {
         return ResponseEntity.ok(usuarioService.obtenerMisHijos(principal.getName()));
     }
 

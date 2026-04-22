@@ -1,11 +1,10 @@
 package cl.colegio.autenticacion.config;
 
-import cl.colegio.autenticacion.service.JwtAuthFilter;
-import cl.colegio.autenticacion.service.UsuarioDetailsService;
+import cl.colegio.autenticacion.security.JwtAuthFilter;
+import cl.colegio.autenticacion.security.UsuarioDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -32,14 +31,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .cors(cors -> {})  // Activa CORS usando CorsConfigurationSource bean
+                .cors(AbstractHttpConfigurer::disable) // CORS se maneja en el API Gateway
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // ── Endpoints públicos ───────────────────────────────
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/validate", "/auth/refresh").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
+                        // ── Perfil y cambio de password: requiere autenticación ──
+                        .requestMatchers("/auth/me", "/auth/password").authenticated()
                         // ── Gestión de usuarios: solo ADMIN ─────────────────
                         .requestMatchers("/usuarios/mis-hijos").hasRole("APODERADO")
                         .requestMatchers("/usuarios/**").hasRole("ADMIN")
@@ -48,8 +48,6 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                // Permitir H2 console en iframe
-                .headers(h -> h.frameOptions(f -> f.sameOrigin()))
                 .build();
     }
 

@@ -1,5 +1,6 @@
 package cl.colegio.autenticacion.service;
 
+import cl.colegio.autenticacion.entity.Usuario;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -22,20 +23,28 @@ public class JwtService {
     @Value("${jwt.expiration-ms}")
     private long expirationMs;
 
-    // ── Generación ──────────────────────────────────────────────────────────
+    @Value("${jwt.refresh-expiration-ms}")
+    private long refreshExpirationMs;
 
-    public String generarToken(cl.colegio.autenticacion.entity.Usuario usuario) {
+    // ── Generación de Access Token ──────────────────────────────────────────
+
+    public String generarToken(Usuario usuario) {
         Map<String, Object> claims = Map.of(
                 "id",  usuario.getId(),
                 "rol", usuario.getRol().name()
         );
-        return Jwts.builder()
-                .claims(claims)
-                .subject(usuario.getRut())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(getSigningKey())
-                .compact();
+        return buildToken(claims, usuario.getRut(), expirationMs);
+    }
+
+    // ── Generación de Refresh Token ─────────────────────────────────────────
+
+    public String generarRefreshToken(Usuario usuario) {
+        Map<String, Object> claims = Map.of(
+                "id",   usuario.getId(),
+                "rol",  usuario.getRol().name(),
+                "type", "refresh"
+        );
+        return buildToken(claims, usuario.getRut(), refreshExpirationMs);
     }
 
     // ── Validación ──────────────────────────────────────────────────────────
@@ -49,6 +58,15 @@ public class JwtService {
         try {
             getClaims(token); // lanza excepción si es inválido
             return !estaExpirado(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean esRefreshToken(String token) {
+        try {
+            String type = getClaims(token).get("type", String.class);
+            return "refresh".equals(type);
         } catch (Exception e) {
             return false;
         }
@@ -69,6 +87,16 @@ public class JwtService {
     }
 
     // ── Internos ────────────────────────────────────────────────────────────
+
+    private String buildToken(Map<String, Object> claims, String subject, long expiration) {
+        return Jwts.builder()
+                .claims(claims)
+                .subject(subject)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
 
     private boolean estaExpirado(String token) {
         return extraerClaim(token, Claims::getExpiration).before(new Date());

@@ -1,4 +1,4 @@
-package cl.colegio.autenticacion.service;
+package cl.colegio.autenticacion.security;
 
 import cl.colegio.autenticacion.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
