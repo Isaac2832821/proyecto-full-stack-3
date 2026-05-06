@@ -47,6 +47,12 @@ spring:
           predicates:
             - Path=/calificaciones/**
 
+        # — Asistencia (ms-asistencia) —
+        - id: ms-asistencia
+          uri: lb://ms-asistencia
+          predicates:
+            - Path=/asistencia/**
+
 # ── Servidor ──────────────────────────────────────────────────────────────
 server:
   port: 8080

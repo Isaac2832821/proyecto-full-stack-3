@@ -15,6 +15,7 @@
         <module>eureka-server</module>
         <module>ms-autenticacion</module>
         <module>ms-calificaciones</module>
+        <module>ms-asistencia</module>
         <module>api-gateway</module>
     </modules>
 </project>

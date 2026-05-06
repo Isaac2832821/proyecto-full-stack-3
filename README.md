@@ -1,390 +1,258 @@
-# 🏫 Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+# 🏫 Sistema de Gestión Escolar — Colegio Bernardo O'Higgins
 
-Sistema de gestión escolar completo basado en arquitectura de **microservicios** con **Spring Boot 3.4.4** y **Spring Cloud 2024.0.3**, con frontend en Vanilla JS.
+> Plataforma web full-stack de gestión escolar con arquitectura de microservicios, autenticación JWT, base de datos Firestore y frontend moderno en Vite + Vanilla JS.
 
----
-
-## 📋 Índice
-
-- [Arquitectura General](#-arquitectura-general)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Módulos](#-módulos)
-- [Orden de Ejecución](#-orden-de-ejecución)
-- [API REST — Endpoints](#-api-rest--endpoints)
-- [Seguridad y JWT](#-seguridad-y-jwt)
-- [Modelo de Datos](#-modelo-de-datos-firestore)
-- [Datos Semilla](#-datos-semilla)
-- [Tests Unitarios](#-tests-unitarios)
-- [Configuraciones Importantes](#-configuraciones-importantes)
+![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.4-brightgreen?logo=springboot)
+![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2024.0.3-brightgreen?logo=spring)
+![Firebase](https://img.shields.io/badge/Firebase-Firestore-yellow?logo=firebase)
+![Vite](https://img.shields.io/badge/Frontend-Vite%20+%20Vanilla%20JS-purple?logo=vite)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
-## 🏗 Arquitectura General
+## 📋 Descripción General
 
-```text
-                    ┌─────────────────────────────────┐
-                    │       Eureka Server (:8761)      │
-                    │  Registro y descubrimiento de    │
-                    │          servicios               │
-                    └────────────┬────────────────────┘
-                                 │ registra / descubre
-          ┌──────────────────────┼──────────────────────┐
-          ▼                      ▼                      ▼
-┌──────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
-│   api-gateway    │  │  ms-autenticacion   │  │  ms-calificaciones  │
-│    (:8080)       │  │      (:8081)        │  │      (:8082)        │
-│                  │  │                     │  │                     │
-│ Punto de entrada │  │ Login · Registro    │  │ Calificaciones      │
-│ único. Enruta   │─►│ JWT · Usuarios      │  │ Asignaturas         │
-│ con lb://       │  │ Firebase Firestore   │  │ Firebase Firestore  │
-└────────┬─────────┘  └─────────────────────┘  └─────────────────────┘
-         │
-┌────────▼─────────┐
-│   Frontend       │
-│   (:5173)        │
-│  Vanilla JS/Vite │
-└──────────────────┘
+El sistema permite la gestión integral de un colegio con tres roles de usuario:
+
+| Rol | Capacidades |
+|-----|-------------|
+| **Administrador** | Gestión de usuarios, profesores, asignaturas, configuración del sistema |
+| **Profesor** | Registro de calificaciones, control de asistencia, mensajería |
+| **Estudiante/Apoderado** | Consulta de notas, asistencia, comunicación con profesores |
+
+---
+
+## 🏗️ Arquitectura del Sistema
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        FRONTEND                              │
+│              Vite + Vanilla JS (Puerto 5173)                 │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTP / REST
+┌──────────────────────────▼──────────────────────────────────┐
+│                      API GATEWAY                             │
+│            Spring Cloud Gateway (Puerto 8080)                │
+│         JWT Validation · Rate Limiting · Routing             │
+└──┬───────────────┬───────────────┬────────────────┬─────────┘
+   │               │               │                │
+┌──▼──────┐ ┌──────▼──────┐ ┌─────▼──────┐ ┌──────▼──────┐
+│  ms-    │ │    ms-      │ │   ms-      │ │   Eureka    │
+│  auth   │ │  califica-  │ │ asistencia │ │   Server    │
+│  :8081  │ │  ciones     │ │   :8083    │ │   :8761     │
+│         │ │   :8082     │ │            │ │             │
+└──┬──────┘ └──────┬──────┘ └─────┬──────┘ └─────────────┘
+   │               │               │
+   └───────────────┴───────────────┘
+                   │
+        ┌──────────▼──────────┐
+        │  Google Firestore   │
+        │   (Base de datos)   │
+        └─────────────────────┘
 ```
 
-**Flujo de una petición:**
-1. El frontend hace `fetch` al **api-gateway** (`:8080`).
-2. El gateway consulta **Eureka** para resolver la IP del servicio destino (`lb://`).
-3. La petición llega al microservicio correspondiente.
-4. Cada microservicio valida el JWT de forma **independiente** usando la misma clave secreta.
+### Componentes
+
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| `eureka-server` | 8761 | Registro y descubrimiento de servicios (Netflix Eureka) |
+| `api-gateway` | 8080 | Puerta de entrada única, validación JWT, enrutamiento |
+| `ms-autenticacion` | 8081 | Login, registro, gestión de usuarios y tokens JWT |
+| `ms-calificaciones` | 8082 | CRUD de calificaciones y asignaturas por curso |
+| `ms-asistencia` | 8083 | Registro y consulta de asistencia de alumnos |
+| `frontend` | 5173 | SPA en Vite + Vanilla JS con diseño corporativo |
 
 ---
 
-## 🛠 Stack Tecnológico
+## 🛠️ Stack Tecnológico
 
-| Tecnología               | Versión     | Uso                                           |
-|--------------------------|-------------|-----------------------------------------------|
-| **Java**                 | 17          | Lenguaje principal backend                    |
-| **Spring Boot**          | 3.4.4       | Framework base de todos los microservicios    |
-| **Spring Cloud**         | 2024.0.3    | Infraestructura de microservicios             |
-| **Netflix Eureka**       | —           | Service Discovery                             |
-| **Spring Cloud Gateway** | —           | API Gateway reactivo (WebFlux)                |
-| **Firebase Admin SDK**   | 9.3.0       | Conexión con Firestore Database (backend)     |
-| **Spring Security**      | —           | Autenticación y autorización por roles        |
-| **JJWT**                 | 0.12.6      | Generación y validación de tokens JWT         |
-| **Lombok**               | —           | Reducción de boilerplate                      |
-| **Swagger / OpenAPI**    | 2.8.6       | Documentación interactiva de la API           |
-| **JUnit 5 + Mockito**    | —           | Tests unitarios (`ms-autenticacion`)          |
-| **Vite / Vanilla JS**    | 6.x         | Frontend SPA                                  |
+### Backend
+- **Java 17** con **Spring Boot 3.4.4**
+- **Spring Cloud 2024.0.3** (Eureka, Gateway)
+- **Spring Security** + **JJWT 0.12.6** para autenticación
+- **Firebase Admin SDK 9.x** + **Cloud Firestore** como base de datos NoSQL
+- **SpringDoc OpenAPI 2.8.6** (Swagger UI)
+- **Lombok** para reducción de boilerplate
+
+### Frontend
+- **Vite** como build tool
+- **Vanilla JS** (ES Modules)
+- **Firebase JS SDK** para autenticación y Firestore en tiempo real
+- **Chart.js** para visualización de datos
+- **CSS personalizado** con diseño corporativo (paleta #1F3A5F)
 
 ---
 
 ## 📁 Estructura del Proyecto
 
-```text
+```
 proyecto/
-├── pom.xml                          # POM padre (multi-módulo Maven)
-├── README.md                        # Esta documentación
-├── informe_estado_proyecto.md       # Historial de desarrollo y sesiones
-│
-├── eureka-server/                   # Servidor de descubrimiento (:8761)
-├── api-gateway/                     # Puerta de entrada única (:8080)
-│
-├── ms-autenticacion/                # Microservicio de auth (:8081)
-│   └── src/main/java/cl/colegio/autenticacion/
-│       ├── config/         # SecurityConfig, FirebaseConfig, CorsConfig, DataSeeder, OpenApiConfig
-│       ├── controller/     # AuthController, UsuarioController
-│       ├── dto/            # RegisterRequest, LoginRequest, AuthResponse, UsuarioDTO...
-│       ├── entity/         # Usuario, Rol (enum)
-│       ├── exception/      # UsuarioNotFoundException, DuplicateResourceException, GlobalExceptionHandler
-│       ├── repository/     # UsuarioRepository (Firestore)
-│       ├── security/       # JwtAuthFilter, UsuarioDetailsService
-│       └── service/        # AuthService, JwtService, UsuarioService
-│
-├── ms-calificaciones/               # Microservicio de calificaciones (:8082)
-│   └── src/main/java/cl/colegio/calificaciones/
-│       ├── config/         # SecurityConfig, FirebaseConfig, CorsConfig
-│       ├── controller/     # CalificacionController, AsignaturaController
-│       ├── dto/            # CalificacionRequest, AsignaturaRequest
-│       ├── entity/         # Calificacion (+ enum TipoEvaluacion), Asignatura
-│       ├── exception/      # GlobalExceptionHandler
-│       ├── repository/     # CalificacionRepository, AsignaturaRepository (Firestore)
-│       ├── security/       # JwtAuthFilter, JwtService
-│       └── service/        # CalificacionService, AsignaturaService
-│
-└── frontend/                        # Cliente Web SPA (:5173)
-    ├── index.html
-    ├── package.json
-    └── src/
-        ├── main.js          # Toda la lógica: login, registro, dashboard, fetch
-        └── styles/main.css  # Sistema de estilos Dark Mode
+├── eureka-server/          # Servidor de descubrimiento Eureka
+├── api-gateway/            # API Gateway con Spring Cloud Gateway
+├── ms-autenticacion/       # Microservicio de autenticación
+├── ms-calificaciones/      # Microservicio de calificaciones
+├── ms-asistencia/          # Microservicio de asistencia
+├── frontend/               # SPA Frontend (Vite + Vanilla JS)
+│   ├── src/
+│   │   ├── main.js         # Lógica principal + vistas SPA
+│   │   ├── mensajeria.js   # Módulo de mensajería en tiempo real
+│   │   ├── firebase.js     # Configuración Firebase
+│   │   ├── assets/         # Recursos estáticos (logo, video)
+│   │   └── styles/
+│   │       └── main.css    # Estilos corporativos
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
+├── imagenes/               # Recursos del proyecto (logo)
+├── pom.xml                 # POM padre (multi-módulo Maven)
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## 📦 Módulos
+## 🚀 Guía de Instalación y Ejecución
 
-### 1. eureka-server
-Servidor de descubrimiento (Netflix Eureka). Actúa como "directorio": cada microservicio se registra aquí al arrancar y el API Gateway lo consulta para enrutar peticiones.
-- **Puerto:** `8761` · **Dashboard:** `http://localhost:8761`
-- Modo standalone — no se autoregistra (`register-with-eureka: false`)
+### Prerrequisitos
 
----
+- Java 17+
+- Maven 3.8+
+- Node.js 18+
+- Cuenta de Firebase con proyecto activo y Firestore habilitado
+- Archivo `serviceAccountKey.json` (credenciales de Firebase — **NO subir al repositorio**)
 
-### 2. api-gateway
-Punto de entrada único. El frontend solo habla con este servicio; él decide a qué microservicio reenviar según la ruta.
-- **Puerto:** `8080` · **Tecnología:** Spring Cloud Gateway (WebFlux/reactivo)
-
-| Ruta                  | Destino             |
-|-----------------------|---------------------|
-| `/auth/**`            | `ms-autenticacion`  |
-| `/usuarios/**`        | `ms-autenticacion`  |
-| `/calificaciones/**`  | `ms-calificaciones` |
-| `/asignaturas/**`     | `ms-calificaciones` |
-
----
-
-### 3. ms-autenticacion
-Microservicio central de autenticación. Emite los JWT que todos los demás servicios validan.
-- **Puerto:** `8081` · **Swagger:** `http://localhost:8081/swagger-ui.html`
-- **BD:** Firestore — colección `usuarios`
-
-**Funcionalidades:** Registro · Login · Refresh Token · Perfil · Cambiar contraseña · CRUD usuarios · Ver hijos (apoderado)
-
----
-
-### 4. ms-calificaciones
-Gestión de calificaciones y asignaturas. Valida JWT de forma independiente sin consultar a `ms-autenticacion`.
-- **Puerto:** `8082` · **Swagger:** `http://localhost:8082/swagger-ui.html`
-- **BD:** Firestore — colecciones `calificaciones` y `asignaturas`
-
-**Tipos de evaluación:** `PRUEBA` · `TAREA` · `EXAMEN` · `TRABAJO` · `PRESENTACION`
-
----
-
-### 5. frontend
-SPA en Vanilla JS con Vite. Todas las peticiones van al api-gateway (`:8080`).
-- **Puerto:** `5173`
-- **Vistas por rol:** ADMIN (gestión usuarios) · APODERADO (hijos + notas) · DOCENTE (registrar calificaciones) · ESTUDIANTE (mis notas)
-
----
-
-## 🚀 Orden de Ejecución
+### 1. Clonar el repositorio
 
 ```bash
-# 1. Eureka (el registro debe estar primero)
-cd eureka-server && mvn spring-boot:run
+git clone https://github.com/TU_USUARIO/proyecto-colegio.git
+cd proyecto-colegio
+```
 
-# 2. Microservicio de autenticación
+### 2. Configurar credenciales Firebase
+
+Coloca tu archivo `serviceAccountKey.json` en la raíz de cada microservicio que lo requiera:
+- `ms-autenticacion/serviceAccountKey.json`
+- `ms-calificaciones/serviceAccountKey.json`
+- `ms-asistencia/serviceAccountKey.json`
+
+> ⚠️ **NUNCA subas este archivo a Git.** Está ignorado en `.gitignore`.
+
+### 3. Iniciar servicios backend (orden obligatorio)
+
+```bash
+# 1. Eureka Server
+cd eureka-server
+mvn spring-boot:run
+
+# 2. API Gateway (en otra terminal)
+cd api-gateway
+mvn spring-boot:run
+
+# 3. Microservicios (en terminales separadas)
 cd ms-autenticacion && mvn spring-boot:run
-
-# 3. Microservicio de calificaciones
 cd ms-calificaciones && mvn spring-boot:run
-
-# 4. API Gateway (necesita que Eureka tenga los servicios)
-cd api-gateway && mvn spring-boot:run
-
-# 5. Frontend
-cd frontend && npm install && npm run dev
+cd ms-asistencia    && mvn spring-boot:run
 ```
 
-> Abre **http://localhost:5173** en el navegador.
-> El gateway puede tardar 10-15 segundos en descubrir los servicios tras el arranque.
-
----
-
-## 🌐 API REST — Endpoints
-
-### `/auth` — Autenticación 🔓
-
-| Método | Ruta              | Descripción                               | Auth |
-|--------|-------------------|-------------------------------------------|------|
-| POST   | `/auth/register`  | Registrar nuevo usuario                   | No   |
-| POST   | `/auth/login`     | Login — retorna `accessToken` + `refreshToken` | No |
-| POST   | `/auth/refresh`   | Renovar access token con refresh token    | No   |
-| GET    | `/auth/validate`  | Validar si un token es vigente            | No   |
-| GET    | `/auth/me`        | Perfil del usuario autenticado            | 🔒   |
-| PATCH  | `/auth/password`  | Cambiar contraseña propia                 | 🔒   |
-
-### `/usuarios` — Gestión de Usuarios 🔒
-
-| Método | Ruta                   | Descripción                         | Rol         |
-|--------|------------------------|-------------------------------------|-------------|
-| GET    | `/usuarios`            | Listar todos los usuarios           | `ADMIN`     |
-| GET    | `/usuarios/mis-hijos`  | Estudiantes a cargo del apoderado   | `APODERADO` |
-| GET    | `/usuarios/{id}`       | Obtener usuario por ID              | `ADMIN`     |
-| PATCH  | `/usuarios/{id}/rol`   | Cambiar rol de un usuario           | `ADMIN`     |
-| DELETE | `/usuarios/{id}`       | Desactivar usuario (borrado lógico) | `ADMIN`     |
-
-### `/calificaciones` — Notas 🔒
-
-| Método | Ruta                                        | Descripción                        | Rol                |
-|--------|---------------------------------------------|------------------------------------|--------------------|
-| POST   | `/calificaciones`                           | Registrar calificación             | `DOCENTE`          |
-| GET    | `/calificaciones`                           | Listar todas                       | `ADMIN`, `DOCENTE` |
-| GET    | `/calificaciones/{id}`                      | Obtener por ID                     | Autenticado        |
-| GET    | `/calificaciones/mis-registros`             | Del docente autenticado            | `DOCENTE`          |
-| GET    | `/calificaciones/estudiante/{estudianteId}` | Por estudiante (RUT)               | Autenticado        |
-| GET    | `/calificaciones/asignatura/{asignaturaId}` | Por asignatura                     | Autenticado        |
-| PUT    | `/calificaciones/{id}`                      | Actualizar calificación            | `DOCENTE`          |
-| DELETE | `/calificaciones/{id}`                      | Eliminar calificación              | `ADMIN`, `DOCENTE` |
-
-### `/asignaturas` — Materias 🔒
-
-| Método | Ruta                           | Descripción                        | Rol         |
-|--------|--------------------------------|------------------------------------|-------------|
-| POST   | `/asignaturas`                 | Crear asignatura                   | `ADMIN`     |
-| GET    | `/asignaturas`                 | Listar todas                       | Autenticado |
-| GET    | `/asignaturas/{id}`            | Obtener por ID                     | Autenticado |
-| GET    | `/asignaturas/mis-asignaturas` | Asignaturas del docente autenticado| `DOCENTE`   |
-| PUT    | `/asignaturas/{id}`            | Actualizar asignatura              | `ADMIN`     |
-| DELETE | `/asignaturas/{id}`            | Eliminar asignatura                | `ADMIN`     |
-
----
-
-## 🔐 Seguridad y JWT
-
-### Flujo completo
-
-```text
-1. POST /auth/login  →  Spring Security verifica credenciales (BCrypt)
-2. ms-autenticacion genera:
-   - accessToken  (24 horas)  → para peticiones normales
-   - refreshToken (7 días)    → para renovar sin re-login
-3. Frontend guarda ambos tokens en localStorage
-4. Cada request incluye: Authorization: Bearer <accessToken>
-5. El microservicio receptor valida el token con la clave secreta compartida
-   (sin consultar a ms-autenticacion — independencia total)
-6. Si expira: POST /auth/refresh → nuevos tokens sin re-login
-```
-
-### Payload del JWT
-
-```json
-{
-  "sub":    "12345678-9",      // RUT del usuario
-  "id":     "docId-firestore", // Document ID en Firestore
-  "rol":    "DOCENTE",         // Rol del usuario
-  "type":   "access",          // "access" o "refresh"
-  "iat":    1714000000,
-  "exp":    1714086400
-}
-```
-
-### Clave secreta compartida
-
-Ambos microservicios usan la **misma clave** en `application.yml`:
-```yaml
-jwt:
-  secret: 5A7234753778214125442A472D4B6150645367566B5970337336763979244226
-  expiration-ms: 86400000       # 24h (access)
-  refresh-expiration-ms: 604800000  # 7 días (refresh) — solo ms-autenticacion
-```
-
----
-
-## 📊 Modelo de Datos (Firestore)
-
-### Colección `usuarios`
-
-| Campo        | Tipo    | Descripción                                    |
-|--------------|---------|------------------------------------------------|
-| `rut`        | String  | Único. Formato `12345678-9`                    |
-| `nombre`     | String  |                                                |
-| `apellido`   | String  |                                                |
-| `email`      | String  | Único                                          |
-| `password`   | String  | Hash BCrypt                                    |
-| `rol`        | String  | `ADMIN` · `DOCENTE` · `ESTUDIANTE` · `APODERADO` |
-| `idApoderado`| String  | ID del apoderado (solo si `rol = ESTUDIANTE`)  |
-| `activo`     | Boolean | `false` = desactivado (borrado lógico)         |
-
-### Colección `calificaciones`
-
-| Campo            | Tipo    | Descripción                                         |
-|------------------|---------|-----------------------------------------------------|
-| `estudianteId`   | String  | RUT del estudiante                                  |
-| `estudianteNombre` | String |                                                    |
-| `asignaturaId`   | String  |                                                     |
-| `asignaturaNombre` | String |                                                    |
-| `nota`           | Double  | Rango `1.0 – 7.0` (validado)                       |
-| `tipo`           | String  | `PRUEBA` · `TAREA` · `EXAMEN` · `TRABAJO` · `PRESENTACION` |
-| `fecha`          | String  | Formato ISO 8601 (`yyyy-MM-dd`)                     |
-| `observacion`    | String  | Opcional                                            |
-| `docenteId`      | String  | RUT del docente — extraído del JWT automáticamente  |
-
-### Colección `asignaturas`
-
-| Campo          | Tipo    | Descripción                  |
-|----------------|---------|------------------------------|
-| `nombre`       | String  | Ej: "Matemáticas"            |
-| `descripcion`  | String  |                              |
-| `docenteId`    | String  | RUT del docente a cargo      |
-| `docenteNombre`| String  |                              |
-| `activa`       | Boolean |                              |
-
----
-
-## 🌱 Datos Semilla
-
-Al arrancar `ms-autenticacion`, el `DataSeeder` puebla Firestore si está vacío:
-
-| RUT           | Nombre             | Rol          | Contraseña   |
-|---------------|--------------------|--------------|-------------|
-| `11111111-1`  | Administrador Sistema | `ADMIN`   | `Admin1234!` |
-| `22222222-2`  | María González     | `DOCENTE`    | `Admin1234!` |
-| `33333333-3`  | Carlos Rodríguez   | `APODERADO`  | `Admin1234!` |
-| `44444444-4`  | Sofía Rodríguez    | `ESTUDIANTE` | `Admin1234!` |
-
----
-
-## 🧪 Tests Unitarios
-
-El `ms-autenticacion` tiene suite de tests en `AuthServiceTest.java` (JUnit 5 + Mockito).
-
-| Grupo              | Casos cubiertos                                                  |
-|--------------------|------------------------------------------------------------------|
-| **Registro**       | ✅ Exitoso · ❌ RUT duplicado · ❌ Email duplicado               |
-| **Login**          | ✅ Exitoso con tokens · ❌ Usuario inexistente                   |
-| **Refresh Token**  | ✅ Válido genera nuevos tokens · ❌ Token inválido               |
-| **Perfil**         | ✅ Retorna UsuarioDTO · ❌ Usuario inexistente                   |
-| **Cambiar password** | ✅ Exitoso · ❌ Contraseña actual incorrecta                   |
+### 4. Iniciar el frontend
 
 ```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
+
+---
+
+## 🔐 Seguridad
+
+- Autenticación basada en **JWT (HS256)** con expiración configurable
+- Validación del token en el **API Gateway** antes de enrutar
+- Filtro `JwtAuthFilter` en cada microservicio como capa adicional
+- Roles de usuario: `ADMIN`, `PROFESOR`, `ESTUDIANTE`, `APODERADO`
+- Credenciales de Firebase excluidas del repositorio vía `.gitignore`
+
+---
+
+## 📡 Endpoints Principales
+
+### ms-autenticacion (`:8081`)
+
+| Método | Ruta | Acceso | Descripción |
+|--------|------|--------|-------------|
+| POST | `/api/auth/login` | Público | Autenticación y obtención de JWT |
+| POST | `/api/auth/register` | ADMIN | Registro de nuevos usuarios |
+| GET | `/api/usuarios` | ADMIN | Listado de usuarios |
+| GET | `/api/usuarios/{id}` | ADMIN | Detalle de usuario |
+| PUT | `/api/usuarios/{id}` | ADMIN | Actualización de usuario |
+| DELETE | `/api/usuarios/{id}` | ADMIN | Eliminación de usuario |
+
+### ms-calificaciones (`:8082`)
+
+| Método | Ruta | Acceso | Descripción |
+|--------|------|--------|-------------|
+| GET | `/api/calificaciones` | PROF/EST | Listado de calificaciones |
+| POST | `/api/calificaciones` | PROFESOR | Registrar calificación |
+| PUT | `/api/calificaciones/{id}` | PROFESOR | Actualizar calificación |
+| DELETE | `/api/calificaciones/{id}` | PROFESOR | Eliminar calificación |
+| GET | `/api/asignaturas` | Autenticado | Listado de asignaturas |
+| POST | `/api/asignaturas` | ADMIN | Crear asignatura |
+
+### ms-asistencia (`:8083`)
+
+| Método | Ruta | Acceso | Descripción |
+|--------|------|--------|-------------|
+| GET | `/api/asistencia` | PROF/EST | Consultar registros de asistencia |
+| POST | `/api/asistencia` | PROFESOR | Registrar asistencia |
+| GET | `/api/asistencia/alumno/{id}` | PROF/EST | Asistencia por alumno |
+
+---
+
+## 🌐 Documentación Swagger
+
+Con los servicios corriendo, accede a la documentación interactiva:
+
+- **ms-autenticacion**: http://localhost:8081/swagger-ui.html
+- **ms-calificaciones**: http://localhost:8082/swagger-ui.html
+- **ms-asistencia**: http://localhost:8083/swagger-ui.html
+- **api-gateway**: http://localhost:8080/swagger-ui.html
+
+---
+
+## 🎨 Frontend — Diseño
+
+El frontend implementa un diseño corporativo tipo SaaS con:
+- **Paleta de colores**: Primario `#1F3A5F` (azul marino corporativo)
+- **Tipografía**: Inter + Poppins (Google Fonts)
+- **Login**: Fondo de video animado con glassmorphism
+- **Dashboard**: Sidebar responsivo, topbar con perfil de usuario
+- **Gráficos**: Chart.js para visualización de calificaciones y asistencia
+- **Mensajería**: Tiempo real con Firestore
+
+---
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests de todos los módulos desde la raíz
+mvn test
+
+# Solo un módulo
 cd ms-autenticacion
 mvn test
 ```
 
 ---
 
-## ⚙ Configuraciones Importantes
+## 👥 Equipo de Desarrollo
 
-### Puertos del sistema
+> Proyecto académico — Ingeniería en Informática
 
-| Servicio            | Puerto |
-|---------------------|--------|
-| Eureka Server       | `8761` |
-| API Gateway         | `8080` |
-| ms-autenticacion    | `8081` |
-| ms-calificaciones   | `8082` |
-| Frontend (Vite)     | `5173` |
+---
 
-### `serviceAccountKey.json`
+## 📄 Licencia
 
-Cada microservicio que accede a Firestore necesita este archivo en `src/main/resources/`. **No se sube al repositorio** (está en `.gitignore`). Descárgalo desde Firebase Console → Configuración del Proyecto → Cuentas de Servicio.
-
-### Exclusión de JPA/SQL
-
-`ms-autenticacion` y `ms-calificaciones` excluyen la autoconfiguración de JPA ya que usan Firestore:
-
-```yaml
-spring:
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-```
-
-### CORS
-
-Cada microservicio tiene `CorsConfig.java` que permite `*` porque el control real de CORS se hace en el API Gateway (que deduplica headers con el filtro `DedupeResponseHeader`).
-
-### Compilar todo el proyecto
-
-```bash
-mvn clean install -DskipTests
-```
+Este proyecto es de uso académico. Todos los derechos reservados.

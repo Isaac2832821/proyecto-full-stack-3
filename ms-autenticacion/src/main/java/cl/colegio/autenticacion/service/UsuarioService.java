@@ -64,6 +64,14 @@ public class UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    // ── Admin: activar usuario ──────────────────────────────────────────────
+
+    public void activar(String id) {
+        var usuario = buscarUsuarioPorId(id);
+        usuario.setActivo(true);
+        usuarioRepository.save(usuario);
+    }
+
     // ── Método privado reutilizable — elimina duplicación ───────────────────
 
     private Usuario buscarUsuarioPorId(String id) {

@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/me", "/auth/password").authenticated()
                         // ── Gestión de usuarios: solo ADMIN ─────────────────
                         .requestMatchers("/usuarios/mis-hijos").hasRole("APODERADO")
+                        .requestMatchers("/usuarios/destinatarios").authenticated()
                         .requestMatchers("/usuarios/**").hasRole("ADMIN")
                         // ── Todo lo demás requiere autenticación ─────────────
                         .anyRequest().authenticated()

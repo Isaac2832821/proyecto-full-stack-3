@@ -2,6 +2,7 @@ package cl.colegio.autenticacion.controller;
 
 import cl.colegio.autenticacion.dto.CambiarRolRequest;
 import cl.colegio.autenticacion.dto.UsuarioDTO;
+import cl.colegio.autenticacion.entity.Rol;
 import cl.colegio.autenticacion.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,6 +33,26 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.listarTodos());
     }
 
+    @Operation(summary = "Listar destinatarios disponibles según el rol del usuario")
+    @GetMapping("/destinatarios")
+    public ResponseEntity<List<UsuarioDTO>> listarDestinatarios(Principal principal) {
+        String rut = principal.getName();
+        String rolStr = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getAuthorities()
+                .iterator().next().getAuthority().replace("ROLE_", "");
+
+        return ResponseEntity.ok(
+            usuarioService.listarTodos().stream()
+                .filter(u -> u.activo() && !u.rut().equals(rut))
+                .filter(u -> switch (rolStr) {
+                    case "ESTUDIANTE" -> Rol.DOCENTE.equals(u.rol());
+                    case "DOCENTE"    -> Rol.ESTUDIANTE.equals(u.rol());
+                    default           -> true;
+                })
+                .toList()
+        );
+    }
+
     @Operation(summary = "Apoderado: Ver estudiantes a cargo")
     @GetMapping("/mis-hijos")
     @PreAuthorize("hasRole('APODERADO')")
@@ -60,6 +81,14 @@ public class UsuarioController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> desactivar(@PathVariable String id) {
         usuarioService.desactivar(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Activar usuario")
+    @PatchMapping("/{id}/activar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> activar(@PathVariable String id) {
+        usuarioService.activar(id);
         return ResponseEntity.noContent().build();
     }
 }

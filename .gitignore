@@ -1,9 +1,9 @@
-# ── IDEs ──
+# ── IDEs ──────────────────────────────────────────────────────────
 .idea/
 *.iml
 .vscode/
 
-# ── Maven ──
+# ── Maven ─────────────────────────────────────────────────────────
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -15,16 +15,36 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-# ── Frontend (Node/Vite) ──
+# ── Frontend (Node/Vite) ──────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
 frontend/*.local
 
-# ── Credenciales y Seguridad (¡MUY IMPORTANTE!) ──
+# ── Credenciales y Seguridad (¡MUY IMPORTANTE!) ───────────────────
 serviceAccountKey.json
 *.env
+.env
 .env.*
+*.pem
+*.key
 
-# ── Logs ──
+# ── Archivos académicos / personales ──────────────────────────────
+imagenes/*.pdf
+imagenes/*.mp4
+imagenes/*.doc
+imagenes/*.docx
+
+# ── Scripts temporales ────────────────────────────────────────────
+fix_orphan.cjs
+*.tmp
+*.bak
+
+# ── Logs ──────────────────────────────────────────────────────────
 *.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

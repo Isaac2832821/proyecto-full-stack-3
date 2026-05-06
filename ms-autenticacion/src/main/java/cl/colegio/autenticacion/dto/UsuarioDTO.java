@@ -10,7 +10,8 @@ public record UsuarioDTO(
         String apellido,
         String email,
         Rol rol,
-        String idApoderado
+        String idApoderado,
+        boolean activo
 ) {
     public static UsuarioDTO from(Usuario u) {
         return new UsuarioDTO(
@@ -20,7 +21,8 @@ public record UsuarioDTO(
                 u.getApellido(),
                 u.getEmail(),
                 u.getRol(),
-                u.getIdApoderado()
+                u.getIdApoderado(),
+                u.isActivo()
         );
     }
 }
