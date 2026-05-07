@@ -2,7 +2,7 @@
 # Stage 1: Build — Compilación de la aplicación Vite
 # Imagen base: node:18-alpine (ligera y segura)
 # ──────────────────────────────────────────────────────────────────
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 LABEL stage="builder"
 LABEL maintainer="Colegio Bernardo O'Higgins"
