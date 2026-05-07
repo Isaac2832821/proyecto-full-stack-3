@@ -1,0 +1,24 @@
+# ══════════════════════════════════════════════════════════════════
+# docker-compose.ec2-frontend.yml — Deploy EC2 Frontend (subred pública)
+#
+# Uso en EC2:
+#   docker compose -f docker-compose.ec2-frontend.yml pull
+#   docker compose -f docker-compose.ec2-frontend.yml up -d
+# ══════════════════════════════════════════════════════════════════
+version: "3.9"
+
+services:
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/colegio-frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    # Puerto 80 expuesto a Internet (Security Group permite 0.0.0.0/0 en 80)
+    ports:
+      - "80:8080"
+    networks:
+      - frontend-net
+
+networks:
+  frontend-net:
+    driver: bridge

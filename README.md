@@ -247,9 +247,170 @@ mvn test
 
 ---
 
+## 🐳 DevOps — Contenedorización y CI/CD
+
+### Dockerfiles (Multi-stage Build)
+
+Cada componente tiene su propio `Dockerfile` con **multi-stage build** y **usuario no-root**:
+
+| Componente | Imagen Builder | Imagen Runtime | Puerto |
+|------------|---------------|----------------|--------|
+| `frontend` | `node:18-alpine` | `nginx:1.25-alpine` | 8080 |
+| `eureka-server` | `maven:3.9-temurin-17-alpine` | `eclipse-temurin:17-jre-alpine` | 8761 |
+| `api-gateway` | `maven:3.9-temurin-17-alpine` | `eclipse-temurin:17-jre-alpine` | 8080 |
+| `ms-autenticacion` | `maven:3.9-temurin-17-alpine` | `eclipse-temurin:17-jre-alpine` | 8081 |
+| `ms-calificaciones` | `maven:3.9-temurin-17-alpine` | `eclipse-temurin:17-jre-alpine` | 8082 |
+| `ms-asistencia` | `maven:3.9-temurin-17-alpine` | `eclipse-temurin:17-jre-alpine` | 8083 |
+
+**Buenas prácticas aplicadas:**
+- ✅ Multi-stage build (imagen final sin herramientas de compilación)
+- ✅ Usuario no-root (`uid 1001`) — principio de mínimo privilegio
+- ✅ Cache de capas Maven (`dependency:go-offline` separado)
+- ✅ `npm ci` en lugar de `npm install` (reproducible)
+- ✅ `HEALTHCHECK` en servicios con Spring Actuator
+
+### Levantar con Docker Compose (local)
+
+```bash
+# 1. Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus valores reales
+
+# 2. Levantar stack completo (build + start)
+docker compose up --build -d
+
+# 3. Verificar estado
+docker compose ps
+
+# 4. Ver logs de un servicio
+docker compose logs -f ms-autenticacion
+
+# 5. Detener y limpiar
+docker compose down -v
+```
+
+### Persistencia de Datos
+
+Se usan **named volumes** (no bind mounts) para los logs de cada servicio:
+
+```
+colegio-eureka-logs
+colegio-gateway-logs
+colegio-autenticacion-logs
+colegio-calificaciones-logs
+colegio-asistencia-logs
+```
+
+**Justificación Named Volumes vs Bind Mounts:**
+- Portables entre hosts — no dependen de rutas absolutas
+- Gestionados por Docker — ciclo de vida controlado
+- Sobreviven reinicios y recreaciones de contenedores
+
+> La persistencia de datos de negocio (usuarios, notas, asistencia) está garantizada por **Google Cloud Firestore** (base de datos PaaS administrada).
+
+---
+
+## 🚀 CI/CD — GitHub Actions
+
+### Pipeline
+
+```
+push → rama deploy
+       │
+       ├── [Frontend pipeline]
+       │     Job 1: Build imagen Docker (node:18 → nginx:alpine)
+       │             └── VITE_API_URL inyectado como build arg
+       │     Job 2: Push → Docker Hub
+       │     Job 3: SSH → EC2 Frontend → docker pull + docker run
+       │
+       └── [Backend pipeline]
+             Job 1: Build x5 en PARALELO (matrix strategy)
+                     eureka-server, api-gateway, ms-autenticacion,
+                     ms-calificaciones, ms-asistencia
+             Job 2: Push todas → Docker Hub
+             Job 3: SSH → EC2 Backend → docker compose pull + up -d
+```
+
+**Trigger:** `push` sobre la rama `deploy`
+
+### GitHub Secrets requeridos
+
+| Secret | Descripción |
+|--------|-------------|
+| `DOCKERHUB_USERNAME` | Usuario Docker Hub |
+| `DOCKERHUB_TOKEN` | Access token Docker Hub |
+| `VITE_API_URL` | URL del backend EC2 (`http://<IP>:8080`) |
+| `EC2_FRONTEND_HOST` | IP pública EC2 Frontend |
+| `EC2_FRONTEND_USER` | Usuario SSH (ej: `ec2-user`) |
+| `EC2_FRONTEND_KEY` | Clave privada PEM (contenido completo) |
+| `EC2_BACKEND_HOST` | IP pública EC2 Backend |
+| `EC2_BACKEND_USER` | Usuario SSH (ej: `ec2-user`) |
+| `EC2_BACKEND_KEY` | Clave privada PEM (contenido completo) |
+| `JWT_SECRET` | Clave secreta JWT (≥ 32 chars) |
+
+### Activar el pipeline
+
+```bash
+# Crear y cambiar a la rama deploy
+git checkout -b deploy
+
+# Push → trigger automático del pipeline
+git push origin deploy
+```
+
+---
+
+## ☁️ Arquitectura en AWS EC2
+
+```
+Internet (0.0.0.0/0)
+        │
+        │ Puerto 80
+        ▼
+┌───────────────────┐
+│   EC2 Frontend    │  ← Security Group: inbound 80, 22
+│  (subred pública) │
+│  nginx container  │
+│  :80 → :8080      │
+└────────┬──────────┘
+         │ Puerto 8080 (interno)
+         ▼
+┌───────────────────┐
+│   EC2 Backend     │  ← Security Group: inbound 8080 SOLO desde SG Frontend
+│ (subred privada)  │                    inbound 22 para SSH
+│  eureka  :8761    │
+│  gateway :8080    │
+│  ms-auth :8081    │
+│  ms-calif:8082    │
+│  ms-asist:8083    │
+└────────┬──────────┘
+         │ HTTPS
+         ▼
+  Google Firestore
+```
+
+### Preparar EC2 (una sola vez)
+
+```bash
+# En AMBAS instancias EC2:
+sudo yum update -y
+sudo yum install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker ec2-user
+
+# Solo en EC2 Backend — colocar credenciales Firebase:
+mkdir -p ~/secrets
+# Subir serviceAccountKey.json vía scp:
+# scp -i tu-key.pem serviceAccountKey.json ec2-user@<IP-BACKEND>:~/secrets/
+```
+
+---
+
 ## 👥 Equipo de Desarrollo
 
-> Proyecto académico — Ingeniería en Informática
+> Proyecto académico — Ingeniería en Informática  
+> Asignatura: ISY1101 Introducción a Herramientas DevOps
 
 ---
 

@@ -1,0 +1,111 @@
+# ══════════════════════════════════════════════════════════════════
+# CI/CD Pipeline — Frontend
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Trigger: push sobre la rama 'deploy' con cambios en frontend/
+# Flujo:   Build imagen Docker → Push Docker Hub → Deploy EC2
+# ══════════════════════════════════════════════════════════════════
+name: CI/CD — Frontend
+
+on:
+  push:
+    branches:
+      - deploy
+    paths:
+      - "frontend/**"
+      - "docker-compose.ec2-frontend.yml"
+      - ".github/workflows/deploy-frontend.yml"
+
+# Variables de entorno globales del workflow
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/colegio-frontend
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Build y Push de imagen Docker a Docker Hub
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push imagen Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: 🔐 Login a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Genera tags: latest + sha-<commit>
+      - name: 🏷️ Generar metadata de imagen
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      # Caché de capas de Docker entre builds (reduce tiempo de CI)
+      - name: ⚡ Configurar caché de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build y Push imagen multi-stage
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          dockerfile: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          # VITE_API_URL se inyecta como build arg para que Vite la embeba en el JS
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+          # Caché entre workflows del mismo repositorio
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Deploy automático en EC2 Frontend (subred pública)
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy en EC2 Frontend
+    runs-on: ubuntu-latest
+    needs: build-and-push  # Solo ejecuta si el build fue exitoso
+
+    steps:
+      - name: 📥 Checkout (para obtener docker-compose.ec2-frontend.yml)
+        uses: actions/checkout@v4
+
+      - name: 🖥️ Deploy via SSH en EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_FRONTEND_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Autenticar en Docker Hub desde la EC2
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+              docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+            # Descargar nueva imagen
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/colegio-frontend:latest
+
+            # Detener y eliminar contenedor anterior (sin error si no existe)
+            docker stop frontend 2>/dev/null || true
+            docker rm   frontend 2>/dev/null || true
+
+            # Levantar nuevo contenedor
+            # Puerto 80 → 8080 interno (nginx no-root)
+            docker run -d \
+              --name frontend \
+              --restart unless-stopped \
+              -p 80:8080 \
+              ${{ secrets.DOCKERHUB_USERNAME }}/colegio-frontend:latest
+
+            # Verificar que el contenedor está corriendo
+            docker ps | grep frontend
+
+            # Limpiar imágenes antiguas (mantener solo las últimas 2)
+            docker image prune -f

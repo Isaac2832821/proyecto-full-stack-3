@@ -1,0 +1,133 @@
+# ══════════════════════════════════════════════════════════════════
+# CI/CD Pipeline — Backend (todos los microservicios)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Trigger: push sobre la rama 'deploy' con cambios en backend
+# Flujo:   Build imágenes → Push Docker Hub → Deploy EC2 backend
+# ══════════════════════════════════════════════════════════════════
+name: CI/CD — Backend
+
+on:
+  push:
+    branches:
+      - deploy
+    paths:
+      - "eureka-server/**"
+      - "api-gateway/**"
+      - "ms-autenticacion/**"
+      - "ms-calificaciones/**"
+      - "ms-asistencia/**"
+      - "docker-compose.ec2-backend.yml"
+      - ".github/workflows/deploy-backend.yml"
+
+env:
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Build y Push de todas las imágenes backend
+  # Cada microservicio se construye y publica en paralelo
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Construir todos los servicios en paralelo (matrix)
+      matrix:
+        include:
+          - service: eureka-server
+            context: ./eureka-server
+            image_suffix: colegio-eureka-server
+          - service: api-gateway
+            context: ./api-gateway
+            image_suffix: colegio-api-gateway
+          - service: ms-autenticacion
+            context: ./ms-autenticacion
+            image_suffix: colegio-ms-autenticacion
+          - service: ms-calificaciones
+            context: ./ms-calificaciones
+            image_suffix: colegio-ms-calificaciones
+          - service: ms-asistencia
+            context: ./ms-asistencia
+            image_suffix: colegio-ms-asistencia
+
+    steps:
+      - name: 📥 Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: 🔐 Login a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Generar metadata de imagen
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: ⚡ Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build y Push — ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          dockerfile: ${{ matrix.context }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Deploy en EC2 Backend
+  # Espera a que TODOS los builds terminen antes de desplegar
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy en EC2 Backend
+    runs-on: ubuntu-latest
+    needs: build-and-push  # Espera a que todos los builds terminen
+
+    steps:
+      - name: 📥 Checkout (para obtener docker-compose.ec2-backend.yml)
+        uses: actions/checkout@v4
+
+      - name: 🖥️ Deploy via SSH en EC2 Backend
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.EC2_BACKEND_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Autenticar en Docker Hub
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+              docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+            # Variables de entorno necesarias para el compose
+            export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+
+            # Descargar el docker-compose actualizado desde el repo
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/deploy/docker-compose.ec2-backend.yml \
+              -o /home/${{ secrets.EC2_USER }}/docker-compose.ec2-backend.yml
+
+            # Ir al directorio de trabajo
+            cd /home/${{ secrets.EC2_USER }}
+
+            # Descargar nuevas imágenes de todos los servicios
+            docker compose -f docker-compose.ec2-backend.yml pull
+
+            # Recrear contenedores con las nuevas imágenes
+            # --remove-orphans elimina contenedores de servicios eliminados
+            docker compose -f docker-compose.ec2-backend.yml up -d --remove-orphans
+
+            # Verificar estado de los contenedores
+            docker compose -f docker-compose.ec2-backend.yml ps
+
+            # Limpiar imágenes sin uso
+            docker image prune -f
