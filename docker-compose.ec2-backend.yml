@@ -1,0 +1,130 @@
+# ══════════════════════════════════════════════════════════════════
+# docker-compose.ec2-backend.yml — Deploy EC2 Backend (subred privada)
+#
+# Uso en EC2:
+#   docker compose -f docker-compose.ec2-backend.yml pull
+#   docker compose -f docker-compose.ec2-backend.yml up -d
+# ══════════════════════════════════════════════════════════════════
+version: "3.9"
+
+services:
+
+  eureka-server:
+    image: ${DOCKERHUB_USERNAME}/colegio-eureka-server:latest
+    container_name: eureka-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    networks:
+      - backend-net
+    volumes:
+      - eureka-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  api-gateway:
+    image: ${DOCKERHUB_USERNAME}/colegio-api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - gateway-logs:/app/logs
+
+  ms-autenticacion:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-autenticacion:latest
+    container_name: ms-autenticacion
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      # Bind mount: el archivo serviceAccountKey.json se coloca manualmente en la EC2
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - autenticacion-logs:/app/logs
+
+  ms-calificaciones:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-calificaciones:latest
+    container_name: ms-calificaciones
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - calificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  ms-asistencia:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-asistencia:latest
+    container_name: ms-asistencia
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - asistencia-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  backend-net:
+    driver: bridge
+
+volumes:
+  eureka-logs:
+    name: colegio-eureka-logs
+  gateway-logs:
+    name: colegio-gateway-logs
+  autenticacion-logs:
+    name: colegio-autenticacion-logs
+  calificaciones-logs:
+    name: colegio-calificaciones-logs
+  asistencia-logs:
+    name: colegio-asistencia-logs

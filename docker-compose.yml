@@ -1,0 +1,197 @@
+# ══════════════════════════════════════════════════════════════════
+# docker-compose.yml — Stack completo (Desarrollo Local)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Uso:
+#   cp .env.example .env        # configurar variables
+#   docker compose up --build   # levantar todo
+#   docker compose down -v      # detener y limpiar volúmenes
+# ══════════════════════════════════════════════════════════════════
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────
+# SERVICIOS
+# ──────────────────────────────────────────────────────────────────
+services:
+
+  # ── 1. Eureka Server — Service Discovery ─────────────────────────
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    image: colegio/eureka-server:latest
+    container_name: eureka-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    networks:
+      - backend-net
+    volumes:
+      # Named volume para persistencia de logs
+      - eureka-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── 2. API Gateway — Puerta de entrada única ──────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    image: colegio/api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - gateway-logs:/app/logs
+
+  # ── 3. ms-autenticacion ───────────────────────────────────────────
+  ms-autenticacion:
+    build:
+      context: ./ms-autenticacion
+      dockerfile: Dockerfile
+    image: colegio/ms-autenticacion:latest
+    container_name: ms-autenticacion
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      # Bind mount: credencial Firebase desde el host (archivo sensible, no en imagen)
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-autenticacion/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      # Named volume para logs persistentes
+      - autenticacion-logs:/app/logs
+
+  # ── 4. ms-calificaciones ──────────────────────────────────────────
+  ms-calificaciones:
+    build:
+      context: ./ms-calificaciones
+      dockerfile: Dockerfile
+    image: colegio/ms-calificaciones:latest
+    container_name: ms-calificaciones
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-calificaciones/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - calificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 5. ms-asistencia ─────────────────────────────────────────────
+  ms-asistencia:
+    build:
+      context: ./ms-asistencia
+      dockerfile: Dockerfile
+    image: colegio/ms-asistencia:latest
+    container_name: ms-asistencia
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-asistencia/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - asistencia-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 6. Frontend ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # La URL del backend se fija en tiempo de build (Vite la embebe en el JS)
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    image: colegio/frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    depends_on:
+      - api-gateway
+    networks:
+      - frontend-net
+      - backend-net
+
+# ──────────────────────────────────────────────────────────────────
+# REDES
+# Separación frontend / backend para mayor seguridad
+# ──────────────────────────────────────────────────────────────────
+networks:
+  # Red accesible desde el exterior (frontend)
+  frontend-net:
+    driver: bridge
+
+  # Red interna para microservicios
+  backend-net:
+    driver: bridge
+
+# ──────────────────────────────────────────────────────────────────
+# VOLÚMENES — Named Volumes (persistencia de logs)
+#
+# Se eligieron named volumes (en lugar de bind mounts) porque:
+#   - Son portables entre distintos hosts
+#   - Docker los gestiona automáticamente
+#   - No dependen de rutas absolutas del sistema operativo
+#   - Sobreviven reinicios y recreaciones de contenedores
+#
+# La persistencia de datos de negocio está garantizada por
+# Google Cloud Firestore (base de datos cloud administrada).
+# ──────────────────────────────────────────────────────────────────
+volumes:
+  eureka-logs:
+    name: colegio-eureka-logs
+  gateway-logs:
+    name: colegio-gateway-logs
+  autenticacion-logs:
+    name: colegio-autenticacion-logs
+  calificaciones-logs:
+    name: colegio-calificaciones-logs
+  asistencia-logs:
+    name: colegio-asistencia-logs
