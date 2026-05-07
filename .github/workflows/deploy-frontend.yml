@@ -82,8 +82,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.EC2_FRONTEND_HOST }}
-          username: ${{ secrets.EC2_FRONTEND_USER }}
-          key:      ${{ secrets.EC2_FRONTEND_KEY }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
             # Autenticar en Docker Hub desde la EC2
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | \

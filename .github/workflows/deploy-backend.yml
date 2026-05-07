@@ -101,8 +101,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.EC2_BACKEND_HOST }}
-          username: ${{ secrets.EC2_BACKEND_USER }}
-          key:      ${{ secrets.EC2_BACKEND_KEY }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
             # Autenticar en Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
@@ -114,10 +114,10 @@ jobs:
 
             # Descargar el docker-compose actualizado desde el repo
             curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/deploy/docker-compose.ec2-backend.yml \
-              -o /home/${{ secrets.EC2_BACKEND_USER }}/docker-compose.ec2-backend.yml
+              -o /home/${{ secrets.EC2_USER }}/docker-compose.ec2-backend.yml
 
             # Ir al directorio de trabajo
-            cd /home/${{ secrets.EC2_BACKEND_USER }}
+            cd /home/${{ secrets.EC2_USER }}
 
             # Descargar nuevas imágenes de todos los servicios
             docker compose -f docker-compose.ec2-backend.yml pull
