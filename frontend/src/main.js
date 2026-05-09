@@ -168,7 +168,7 @@ function renderLogin(container) {
   container.innerHTML = `
     <div class="login-page">
       <video class="login-video" autoplay muted loop playsinline>
-        <source src="/src/assets/fondo-login.mp4" type="video/mp4">
+        <source src="/assets/fondo-login.mp4" type="video/mp4">
       </video>
 
       <!-- Overlay oscuro base -->
@@ -268,7 +268,7 @@ function renderRegister(container) {
   container.innerHTML = `
     <div class="login-page">
       <video class="login-video" autoplay muted loop playsinline>
-        <source src="/src/assets/fondo-login.mp4" type="video/mp4">
+        <source src="/assets/fondo-login.mp4" type="video/mp4">
       </video>
       <div class="login-card" style="max-width: 500px;">
         <div class="login-card__logo">
