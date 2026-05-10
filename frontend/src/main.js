@@ -185,7 +185,7 @@ function renderLogin(container) {
       <!-- Formulario de login (oculto inicialmente) -->
       <div class="login-card" id="login-card">
         <div class="login-card__logo">
-          <img src="/src/assets/logo.png" alt="Logo Colegio" style="width:72px;height:72px;object-fit:contain;margin-bottom:0.75rem">
+          <img src="/assets/logo.png" alt="Logo Colegio" style="width:72px;height:72px;object-fit:contain;margin-bottom:0.75rem">
           <h1>Iniciar Sesión</h1>
           <p>Colegio Bernardo O'Higgins</p>
         </div>
@@ -439,7 +439,7 @@ function renderSidebar(rol, nombre, apellido, initials) {
     <aside class="sidebar">
       <div class="sidebar__brand">
         <div style="display:flex;align-items:center;gap:0.75rem">
-          <img src="/src/assets/logo.png" alt="Logo" style="width:42px;height:42px;object-fit:contain;border-radius:6px">
+          <img src="/assets/logo.png" alt="Logo" style="width:42px;height:42px;object-fit:contain;border-radius:6px">
           <div>
             <h2 style="font-size:0.875rem;font-weight:800;color:#1F3A5F;letter-spacing:-0.02em;line-height:1.2">Colegio Bernardo O'Higgins</h2>
             <p style="font-size:0.625rem;color:#6B7280;font-family:var(--font-mono);margin-top:2px">Sistema de Gestión</p>
@@ -479,7 +479,7 @@ function renderSidebarEstudiante(nombre, apellido, initials) {
     <aside class="sidebar lms-sidebar">
       <div class="lms-sidebar__header">
         <div class="lms-sidebar__logo">
-          <img src="/src/assets/logo.png" alt="Logo" style="width:38px;height:38px;object-fit:contain;border-radius:6px">
+          <img src="/assets/logo.png" alt="Logo" style="width:38px;height:38px;object-fit:contain;border-radius:6px">
           <div>
             <div style="font-size:0.8rem;font-weight:800;color:var(--text);letter-spacing:-0.02em">Campus Virtual</div>
             <div style="font-size:0.6rem;color:var(--text-dim);font-family:var(--font-mono)">Colegio B. O'Higgins</div>
