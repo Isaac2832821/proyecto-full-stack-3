@@ -105,6 +105,9 @@ jobs:
           key:      ${{ secrets.EC2_SSH_KEY }}
           script_stop: true  # Falla el step si cualquier comando retorna error
           script: |
+            # Asegurar que el plugin docker compose (V2) esté en el PATH
+            export PATH=$PATH:/usr/libexec/docker/cli-plugins:/usr/lib/docker/cli-plugins
+
             # Autenticar en Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
               docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
@@ -121,14 +124,14 @@ jobs:
             cd /home/${{ secrets.EC2_USER }}
 
             # Descargar nuevas imágenes de todos los servicios
-            docker-compose -f docker-compose.ec2-backend.yml pull
+            docker compose -f docker-compose.ec2-backend.yml pull
 
             # Recrear contenedores con las nuevas imágenes
             # --remove-orphans elimina contenedores de servicios eliminados
-            docker-compose -f docker-compose.ec2-backend.yml up -d --remove-orphans
+            docker compose -f docker-compose.ec2-backend.yml up -d --remove-orphans
 
             # Verificar estado de los contenedores
-            docker-compose -f docker-compose.ec2-backend.yml ps
+            docker compose -f docker-compose.ec2-backend.yml ps
 
             # Limpiar imágenes sin uso
             docker image prune -f
