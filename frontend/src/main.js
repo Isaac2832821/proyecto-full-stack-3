@@ -1,5 +1,5 @@
 // ── Configuración ────────────────────────────────────────────────────────
-const API_BASE = 'http://54.165.48.162:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 import { enviarMensaje, escucharMensajesRecibidos, escucharMensajesEnviados, marcarLeido, escucharNoLeidos } from './firebase.js';
 import { setupMensajes } from './mensajeria.js';
 
