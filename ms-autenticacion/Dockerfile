@@ -17,13 +17,13 @@ RUN mvn package -DskipTests -B -q
 # ──────────────────────────────────────────────────────────────────
 # Stage 2: Runtime — JRE mínimo con usuario no-root
 # ──────────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine AS production
+FROM eclipse-temurin:17-jre AS production
 
 LABEL maintainer="Colegio Bernardo O'Higgins"
 LABEL description="ms-autenticacion — Login, registro y gestión de usuarios JWT"
 
-RUN addgroup -g 1001 -S appgroup && \
-    adduser  -u 1001 -S appuser -G appgroup
+RUN groupadd -g 1001 appgroup && \
+    useradd  -u 1001 -g appgroup -m appuser
 
 WORKDIR /app
 
@@ -36,6 +36,9 @@ RUN mkdir -p /app/config && chown appuser:appgroup /app/config
 USER appuser
 
 EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD wget -qO- http://localhost:8081/api-docs || exit 1
 
 ENTRYPOINT ["java", \
     "-Djava.security.egd=file:/dev/./urandom", \
