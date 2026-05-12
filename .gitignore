@@ -20,6 +20,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
 frontend/*.local
+componente-npm/node_modules/
 
 # ── Credenciales y Seguridad (¡MUY IMPORTANTE!) ───────────────────
 serviceAccountKey.json

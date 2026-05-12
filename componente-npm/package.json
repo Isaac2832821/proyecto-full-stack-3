@@ -1,0 +1,20 @@
+{
+  "name": "colegio-ui-components",
+  "version": "1.0.0",
+  "description": "Componente Frontend empaquetado como NPM para el proyecto Colegio",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "react",
+    "component",
+    "colegio"
+  ],
+  "author": "Alumno",
+  "license": "ISC",
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
