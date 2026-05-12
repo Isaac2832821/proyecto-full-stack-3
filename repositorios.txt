@@ -1,0 +1,25 @@
+======================================================
+     ENTREGA FINAL - ENLACES DE REPOSITORIOS GITHUB
+======================================================
+
+A continuación se listan los repositorios utilizados en el proyecto:
+
+1. Repositorio Principal (Monorepo o Documentación general):
+   [Reemplazar por tu enlace de GitHub - ej. https://github.com/usuario/proyecto-colegio]
+   Descripción: Repositorio central que contiene la documentación general, Docker Compose global y scripts de despliegue (CI/CD) para la infraestructura en AWS.
+
+2. Repositorio Frontend:
+   [Reemplazar por tu enlace de GitHub si lo tienes separado, o indicar que está en el monorepo]
+   Descripción: Aplicación web cliente desarrollada en React + Vite.
+
+3. Repositorio API Gateway (BFF):
+   [Reemplazar por tu enlace de GitHub]
+   Descripción: Punto de entrada único para las peticiones del frontend. Enruta y filtra tráfico hacia los microservicios internos.
+
+4. Repositorio Microservicios:
+   - Autenticación: [Reemplazar por tu enlace de GitHub]
+   - Asistencia: [Reemplazar por tu enlace de GitHub]
+   - Calificaciones: [Reemplazar por tu enlace de GitHub]
+   Descripción: Servicios independientes, cada uno responsable de un dominio específico del sistema.
+   
+*(Nota: Dado que este proyecto parece ser un Monorepo, puedes simplemente poner el enlace a tu repositorio principal arriba y borrar los demás si todo está en el mismo lugar).*
