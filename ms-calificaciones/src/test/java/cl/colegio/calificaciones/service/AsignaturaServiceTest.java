@@ -45,7 +45,7 @@ class AsignaturaServiceTest {
         // Assert
         assertNotNull(resultado);
         assertEquals("Matemáticas", resultado.getNombre());
-        assertTrue(resultado.getActiva());
+        assertTrue(resultado.isActiva());
         verify(asignaturaRepository, times(1)).save(any(Asignatura.class));
     }
 
