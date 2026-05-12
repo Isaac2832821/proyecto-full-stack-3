@@ -17,13 +17,13 @@ RUN mvn package -DskipTests -B -q
 # ──────────────────────────────────────────────────────────────────
 # Stage 2: Runtime — JRE mínimo con usuario no-root
 # ──────────────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine AS production
+FROM eclipse-temurin:17-jre AS production
 
 LABEL maintainer="Colegio Bernardo O'Higgins"
 LABEL description="ms-calificaciones — CRUD de notas y asignaturas"
 
-RUN addgroup -g 1001 -S appgroup && \
-    adduser  -u 1001 -S appuser -G appgroup
+RUN groupadd -g 1001 appgroup && \
+    useradd  -u 1001 -g appgroup -m appuser
 
 WORKDIR /app
 

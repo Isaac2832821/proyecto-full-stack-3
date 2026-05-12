@@ -1,0 +1,95 @@
+# ══════════════════════════════════════════════════════════════════
+# docker-compose.ec2-services.yml — EC2-Services (Microservicios)
+#
+# Variables requeridas en /home/ec2-user/.env:
+#   DOCKERHUB_USERNAME=tu_usuario
+#   JWT_SECRET=tu_jwt_secret
+#   EUREKA_HOST=<IP-PRIVADA-DE-EC2-GATEWAY>   ← clave para comunicación entre instancias
+#
+# Uso en EC2-Services:
+#   docker compose -f docker-compose.ec2-services.yml pull
+#   docker compose -f docker-compose.ec2-services.yml up -d
+# ══════════════════════════════════════════════════════════════════
+version: "3.9"
+
+services:
+
+  # ── ms-autenticacion ─────────────────────────────────────────────
+  ms-autenticacion:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-autenticacion:latest
+    container_name: ms-autenticacion
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      # Apunta a la IP privada de EC2-Gateway (no a localhost)
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      # Le dice a Eureka la IP real de esta instancia para que el Gateway pueda enrutarle
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+    networks:
+      - services-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - autenticacion-logs:/app/logs
+
+  # ── ms-calificaciones ────────────────────────────────────────────
+  ms-calificaciones:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-calificaciones:latest
+    container_name: ms-calificaciones
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+    networks:
+      - services-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - calificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── ms-asistencia ────────────────────────────────────────────────
+  ms-asistencia:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-asistencia:latest
+    container_name: ms-asistencia
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+    networks:
+      - services-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - asistencia-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  services-net:
+    driver: bridge
+
+volumes:
+  autenticacion-logs:
+    name: colegio-autenticacion-logs
+  calificaciones-logs:
+    name: colegio-calificaciones-logs
+  asistencia-logs:
+    name: colegio-asistencia-logs

@@ -8,17 +8,18 @@
 name: CI/CD — Backend
 
 on:
-  push:
-    branches:
-      - deploy
-    paths:
-      - "eureka-server/**"
-      - "api-gateway/**"
-      - "ms-autenticacion/**"
-      - "ms-calificaciones/**"
-      - "ms-asistencia/**"
-      - "docker-compose.ec2-backend.yml"
-      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:   # Solo manual — ya no se triggerea automáticamente
+  # push:             # DESHABILITADO — ahora se usa deploy-gateway.yml + deploy-services.yml
+  #   branches:
+  #     - deploy
+  #   paths:
+  #     - "eureka-server/**"
+  #     - "api-gateway/**"
+  #     - "ms-autenticacion/**"
+  #     - "ms-calificaciones/**"
+  #     - "ms-asistencia/**"
+  #     - "docker-compose.ec2-backend.yml"
+  #     - ".github/workflows/deploy-backend.yml"
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -78,7 +79,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
-          dockerfile: ${{ matrix.context }}/Dockerfile
+          file: ${{ matrix.context }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha,scope=${{ matrix.service }}
