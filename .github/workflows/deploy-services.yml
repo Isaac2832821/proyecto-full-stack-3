@@ -122,8 +122,8 @@ jobs:
             "export PATH=$PATH:/usr/libexec/docker/cli-plugins:/usr/lib/docker/cli-plugins",
             f"echo '{dh_token}' | docker login -u '{dh_user}' --password-stdin",
             f"curl -fsSL 'https://raw.githubusercontent.com/{repo}/deploy/docker-compose.ec2-services.yml' -o /home/ec2-user/docker-compose.ec2-services.yml",
-            f"cd /home/ec2-user && DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml pull",
-            f"cd /home/ec2-user && DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml up -d --remove-orphans",
+            f"cd /home/ec2-user && HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4) DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml pull",
+            f"cd /home/ec2-user && HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4) DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml up -d --remove-orphans",
             "cd /home/ec2-user && docker compose -f docker-compose.ec2-services.yml ps",
             "docker image prune -f",
           ]

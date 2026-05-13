@@ -28,6 +28,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
       # Le dice a Eureka la IP real de esta instancia para que el Gateway pueda enrutarle
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
     networks:
       - services-net
     volumes:
@@ -46,6 +47,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
     networks:
       - services-net
     volumes:
@@ -70,6 +72,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
     networks:
       - services-net
     volumes:
