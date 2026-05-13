@@ -9,8 +9,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 @Configuration
 public class FirebaseConfig {
@@ -18,10 +21,23 @@ public class FirebaseConfig {
     @PostConstruct
     public void initFirebase() throws IOException {
         if (FirebaseApp.getApps().isEmpty()) {
-            InputStream serviceAccount = getClass().getResourceAsStream("/serviceAccountKey.json");
-            if (serviceAccount == null) {
-                throw new IllegalStateException("No se encontró serviceAccountKey.json en resources");
+            InputStream serviceAccount = null;
+
+            // 1) Intentar desde GOOGLE_APPLICATION_CREDENTIALS (Docker/EC2)
+            String credPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+            if (credPath != null && Files.exists(Path.of(credPath))) {
+                serviceAccount = new FileInputStream(credPath);
             }
+
+            // 2) Fallback: buscar en classpath (desarrollo local)
+            if (serviceAccount == null) {
+                serviceAccount = getClass().getResourceAsStream("/serviceAccountKey.json");
+            }
+
+            if (serviceAccount == null) {
+                throw new IllegalStateException("No se encontró serviceAccountKey.json");
+            }
+
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
