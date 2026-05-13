@@ -99,8 +99,14 @@ jobs:
                       "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
+          IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ec2-services" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PrivateIpAddress" \
+            --output text)
           echo "instance_id=$ID" >> $GITHUB_OUTPUT
-          echo "Services instance: $ID"
+          echo "instance_ip=$IP" >> $GITHUB_OUTPUT
+          echo "Services instance: $ID ($IP)"
 
       - name: 🖥️ Deploy via SSM en EC2-Services
         env:
@@ -110,6 +116,7 @@ jobs:
           EUREKA_IP:   ${{ secrets.EUREKA_HOST }}
           REPO:        ${{ github.repository }}
           INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
+          HOST_IP:     ${{ steps.get-instance.outputs.instance_ip }}
         run: |
           python3 << 'PYEOF'
           import json, os
@@ -118,12 +125,13 @@ jobs:
           jwt        = os.environ['JWT']
           eureka_ip  = os.environ['EUREKA_IP']
           repo       = os.environ['REPO']
+          host_ip    = os.environ['HOST_IP']
           commands = [
             "export PATH=$PATH:/usr/libexec/docker/cli-plugins:/usr/lib/docker/cli-plugins",
             f"echo '{dh_token}' | docker login -u '{dh_user}' --password-stdin",
             f"curl -fsSL 'https://raw.githubusercontent.com/{repo}/deploy/docker-compose.ec2-services.yml' -o /home/ec2-user/docker-compose.ec2-services.yml",
-            f"cd /home/ec2-user && HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4) DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml pull",
-            f"cd /home/ec2-user && HOST_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4) DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml up -d --remove-orphans",
+            f"cd /home/ec2-user && HOST_IP='{host_ip}' DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml pull",
+            f"cd /home/ec2-user && HOST_IP='{host_ip}' DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' EUREKA_HOST='{eureka_ip}' docker compose -f docker-compose.ec2-services.yml up -d --remove-orphans",
             "cd /home/ec2-user && docker compose -f docker-compose.ec2-services.yml ps",
             "docker image prune -f",
           ]

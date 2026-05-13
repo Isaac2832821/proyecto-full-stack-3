@@ -2,24 +2,16 @@
      ENTREGA FINAL - ENLACES DE REPOSITORIOS GITHUB
 ======================================================
 
-A continuación se listan los repositorios utilizados en el proyecto:
+Este proyecto está construido como un **Monorepo**. Todos los componentes solicitados se encuentran estructurados en directorios dentro del mismo repositorio.
 
-1. Repositorio Principal (Monorepo o Documentación general):
-   [Reemplazar por tu enlace de GitHub - ej. https://github.com/usuario/proyecto-colegio]
-   Descripción: Repositorio central que contiene la documentación general, Docker Compose global y scripts de despliegue (CI/CD) para la infraestructura en AWS.
-
-2. Repositorio Frontend:
-   [Reemplazar por tu enlace de GitHub si lo tienes separado, o indicar que está en el monorepo]
-   Descripción: Aplicación web cliente desarrollada en React + Vite.
-
-3. Repositorio API Gateway (BFF):
-   [Reemplazar por tu enlace de GitHub]
-   Descripción: Punto de entrada único para las peticiones del frontend. Enruta y filtra tráfico hacia los microservicios internos.
-
-4. Repositorio Microservicios:
-   - Autenticación: [Reemplazar por tu enlace de GitHub]
-   - Asistencia: [Reemplazar por tu enlace de GitHub]
-   - Calificaciones: [Reemplazar por tu enlace de GitHub]
-   Descripción: Servicios independientes, cada uno responsable de un dominio específico del sistema.
+1. **Repositorio Principal (Monorepo)**
+   URL: https://github.com/Isaac2832821/proyecto-full-stack-3
    
-*(Nota: Dado que este proyecto parece ser un Monorepo, puedes simplemente poner el enlace a tu repositorio principal arriba y borrar los demás si todo está en el mismo lugar).*
+   Estructura interna:
+   - `/frontend` : Aplicación web cliente (Componente NPM React + Vite)
+   - `/api-gateway` : Backend For Frontend (BFF) y API Gateway
+   - `/ms-autenticacion` : Microservicio de seguridad y usuarios
+   - `/ms-asistencia` : Microservicio de asistencia
+   - `/ms-calificaciones` : Microservicio de calificaciones
+   - `/arquetipos-maven` : Plantilla base para generación de microservicios
+   - `/.github/workflows` : Pipelines de CI/CD para AWS EC2
