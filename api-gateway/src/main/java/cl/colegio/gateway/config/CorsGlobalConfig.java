@@ -23,7 +23,7 @@ public class CorsGlobalConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://localhost:3000",
-                "http://54.209.173.19"           // Frontend EC2 producción
+                "http://174.129.50.204"           // Frontend EC2 producción
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
