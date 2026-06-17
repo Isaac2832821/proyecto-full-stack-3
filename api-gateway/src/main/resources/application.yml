@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: api-gateway
+
+  # ── Rutas del Gateway ──────────────────────────────────────────────────
+  cloud:
+    gateway:
+      # Habilitar descubrimiento de servicios para rutas dinámicas
+      discovery:
+        locator:
+          enabled: false          # No exponer TODOS los servicios automáticamente
+          lower-case-service-id: true
+
+      # ── Filtros globales (aplicados a TODAS las rutas) ──────────────
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
+      # ── Rutas definidas manualmente ──────────────────────────────────
+      routes:
+        # — Autenticación (endpoints públicos) —
+        - id: ms-autenticacion-auth
+          uri: lb://ms-autenticacion
+          predicates:
+            - Path=/auth/**
+
+        # — Gestión de usuarios (ADMIN / APODERADO) —
+        - id: ms-autenticacion-usuarios
+          uri: lb://ms-autenticacion
+          predicates:
+            - Path=/usuarios/**
+
+        # — Swagger UI del ms-autenticacion —
+        - id: ms-autenticacion-swagger
+          uri: lb://ms-autenticacion
+          predicates:
+            - Path=/swagger-ui/**,/swagger-ui.html,/api-docs/**
+
+        # — Asignaturas (ms-calificaciones) —
+        - id: ms-calificaciones-asignaturas
+          uri: lb://ms-calificaciones
+          predicates:
+            - Path=/asignaturas/**
+
+        # — Calificaciones (ms-calificaciones) —
+        - id: ms-calificaciones-calificaciones
+          uri: lb://ms-calificaciones
+          predicates:
+            - Path=/calificaciones/**
+
+        # — Asistencia (ms-asistencia) —
+        - id: ms-asistencia
+          uri: lb://ms-asistencia
+          predicates:
+            - Path=/asistencia/**
+
+# ── Servidor ──────────────────────────────────────────────────────────────
+server:
+  port: 8080
+
+# ── Eureka Client ─────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# ── Logging ───────────────────────────────────────────────────────────────
+logging:
+  level:
+    cl.colegio: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty: INFO
+
+# ── Actuator ──────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway

@@ -1,0 +1,326 @@
+# ══════════════════════════════════════════════════════════════════
+# docker-compose.yml — Stack completo (Desarrollo Local)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Uso:
+#   cp .env.example .env        # configurar variables
+#   docker compose up --build   # levantar todo
+#   docker compose down -v      # detener y limpiar volúmenes
+# ══════════════════════════════════════════════════════════════════
+version: "3.9"
+
+services:
+
+  # ── 1. Eureka Server — Service Discovery ─────────────────────────
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    image: colegio/eureka-server:latest
+    container_name: eureka-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    networks:
+      - backend-net
+    volumes:
+      - eureka-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── 2. Redis — Cache de reportes estadisticos ─────────────────────
+  # ms-reportes cachea promedios y rankings con TTL configurado.
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - backend-net
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 3. RabbitMQ — Mensajeria asincrona ───────────────────────────
+  # ms-calificaciones publica eventos; ms-notificaciones los consume.
+  # Management UI en http://localhost:15672 (guest/guest)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
+    networks:
+      - backend-net
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── 4. API Gateway — Puerta de entrada unica ──────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    image: colegio/api-gateway:latest
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - gateway-logs:/app/logs
+
+  # ── 5. ms-autenticacion ───────────────────────────────────────────
+  ms-autenticacion:
+    build:
+      context: ./ms-autenticacion
+      dockerfile: Dockerfile
+    image: colegio/ms-autenticacion:latest
+    container_name: ms-autenticacion
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-autenticacion/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - autenticacion-logs:/app/logs
+
+  # ── 6. ms-calificaciones (producer RabbitMQ) ──────────────────────
+  ms-calificaciones:
+    build:
+      context: ./ms-calificaciones
+      dockerfile: Dockerfile
+    image: colegio/ms-calificaciones:latest
+    container_name: ms-calificaciones
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-calificaciones/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - calificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 7. ms-asistencia ─────────────────────────────────────────────
+  ms-asistencia:
+    build:
+      context: ./ms-asistencia
+      dockerfile: Dockerfile
+    image: colegio/ms-asistencia:latest
+    container_name: ms-asistencia
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-asistencia/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - asistencia-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 8. ms-notificaciones (consumer RabbitMQ) ─────────────────────
+  ms-notificaciones:
+    build:
+      context: ./ms-notificaciones
+      dockerfile: Dockerfile
+    image: colegio/ms-notificaciones:latest
+    container_name: ms-notificaciones
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-notificaciones/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - notificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 9. ms-horarios ────────────────────────────────────────────────
+  ms-horarios:
+    build:
+      context: ./ms-horarios
+      dockerfile: Dockerfile
+    image: colegio/ms-horarios:latest
+    container_name: ms-horarios
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - ${FIREBASE_CREDENTIALS_PATH:-./ms-horarios/serviceAccountKey.json}:/app/config/serviceAccountKey.json:ro
+      - horarios-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 10. ms-reportes (Redis cache) ────────────────────────────────
+  ms-reportes:
+    build:
+      context: ./ms-reportes
+      dockerfile: Dockerfile
+    image: colegio/ms-reportes:latest
+    container_name: ms-reportes
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MS_CALIFICACIONES_URL=http://ms-calificaciones:8082
+      - MS_ASISTENCIA_URL=http://ms-asistencia:8083
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - reportes-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 11. Frontend ───────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    image: colegio/frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    depends_on:
+      - api-gateway
+    networks:
+      - frontend-net
+      - backend-net
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+
+volumes:
+  eureka-logs:
+    name: colegio-eureka-logs
+  gateway-logs:
+    name: colegio-gateway-logs
+  autenticacion-logs:
+    name: colegio-autenticacion-logs
+  calificaciones-logs:
+    name: colegio-calificaciones-logs
+  asistencia-logs:
+    name: colegio-asistencia-logs
+  notificaciones-logs:
+    name: colegio-notificaciones-logs
+  horarios-logs:
+    name: colegio-horarios-logs
+  reportes-logs:
+    name: colegio-reportes-logs
+  redis-data:
+    name: colegio-redis-data
+  rabbitmq-data:
+    name: colegio-rabbitmq-data

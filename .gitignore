@@ -1,0 +1,56 @@
+# ── IDEs ──────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+
+# ── Maven ─────────────────────────────────────────────────────────
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ── Frontend (Node/Vite) ──────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+componente-npm/node_modules/
+
+# ── Credenciales y Seguridad (¡MUY IMPORTANTE!) ───────────────────
+serviceAccountKey.json
+*.env
+.env
+.env.*
+*.pem
+*.key
+
+# ── Archivos académicos / personales ──────────────────────────────
+imagenes/*.pdf
+imagenes/*.mp4
+imagenes/*.doc
+imagenes/*.docx
+imagenes/*.exe
+imagenes/*.msi
+imagenes/*.zip
+# Archivos binarios grandes (superan límite 100MB de GitHub)
+*.exe
+
+# ── Scripts temporales ────────────────────────────────────────────
+fix_orphan.cjs
+*.tmp
+*.bak
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

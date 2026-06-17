@@ -1,0 +1,295 @@
+{
+  "info": {
+    "name": "Colegio Bernardo O'Higgins — API Completa",
+    "description": "Colección completa de endpoints del Sistema de Gestión Escolar.\nBase URL: http://localhost:8080 (API Gateway)\n\nAutenticación: Bearer JWT en header Authorization.\nObtener token con POST /auth/login",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "token",    "value": "PEGAR_TOKEN_AQUI" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 Autenticación",
+      "item": [
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const r = pm.response.json();",
+            "if (r.token) { pm.collectionVariables.set('token', r.token); }",
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Tiene token', () => pm.expect(r.token).to.be.a('string'));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"rut\": \"11111111-1\",\n  \"password\": \"Admin1234!\"\n}" }
+          }
+        },
+        {
+          "name": "Registro de usuario (ADMIN)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/register",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"rut\": \"99999999-9\",\n  \"nombre\": \"María\",\n  \"apellido\": \"González\",\n  \"email\": \"maria@colegio.cl\",\n  \"password\": \"Docente1234!\",\n  \"rol\": \"DOCENTE\"\n}" }
+          }
+        },
+        {
+          "name": "Mi Perfil",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/auth/perfil",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Listar Usuarios (ADMIN)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/usuarios",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📝 Calificaciones",
+      "item": [
+        {
+          "name": "Registrar Calificación (DOCENTE)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Tiene ID', () => pm.expect(pm.response.json().id).to.exist);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/calificaciones",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"estudianteId\": \"44444444-4\",\n  \"estudianteNombre\": \"Estudiante Demo\",\n  \"asignaturaId\": \"mat-001\",\n  \"asignaturaNombre\": \"Matemáticas\",\n  \"nota\": 6.5,\n  \"tipo\": \"PRUEBA\",\n  \"descripcion\": \"Prueba Unidad 3\"\n}" }
+          }
+        },
+        {
+          "name": "Mis Calificaciones (DOCENTE)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/calificaciones/mis-registros",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Calificaciones por Estudiante",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/calificaciones/estudiante/44444444-4",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Listar Asignaturas",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/asignaturas",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Crear Asignatura (ADMIN)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/asignaturas",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Matemáticas\",\n  \"descripcion\": \"Álgebra y cálculo\",\n  \"docenteId\": \"22222222-2\",\n  \"docenteNombre\": \"Prof. García\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📋 Asistencia",
+      "item": [
+        {
+          "name": "Registrar Asistencia (DOCENTE)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Tiene estado', () => pm.expect(pm.response.json().estado).to.exist);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/asistencia",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"estudianteId\": \"44444444-4\",\n  \"estudianteNombre\": \"Estudiante Demo\",\n  \"asignaturaId\": \"mat-001\",\n  \"asignaturaNombre\": \"Matemáticas\",\n  \"fecha\": \"2024-06-17\",\n  \"estado\": \"PRESENTE\",\n  \"observacion\": null\n}" }
+          }
+        },
+        {
+          "name": "Asistencia por Estudiante",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/asistencia/estudiante/44444444-4",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Resumen Asistencia (% + estado MINEDUC)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('Tiene porcentaje', () => pm.expect(r.porcentajeAsistencia).to.be.a('number'));",
+            "pm.test('Estado válido', () => pm.expect(['REGULAR','EN_RIESGO','CRITICO']).to.include(r.estadoResumen));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/asistencia/estudiante/44444444-4/resumen",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Asistencia por Fecha",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/asistencia/fecha/2024-06-17",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Mis Registros (DOCENTE)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/asistencia/mis-registros",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔔 Notificaciones",
+      "item": [
+        {
+          "name": "Mis Notificaciones",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Es array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/notificaciones/mis-notificaciones",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Marcar Notificación Leída",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/notificaciones/NOTIF-ID-AQUI/leida",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Listar Todas (ADMIN)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/notificaciones",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📅 Horarios",
+      "item": [
+        {
+          "name": "Listar Horarios",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/horarios",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Crear Horario (ADMIN)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/horarios",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"asignaturaId\": \"mat-001\",\n  \"asignaturaNombre\": \"Matemáticas\",\n  \"docenteId\": \"22222222-2\",\n  \"docenteNombre\": \"Prof. García\",\n  \"curso\": \"1A\",\n  \"diaSemana\": \"LUNES\",\n  \"horaInicio\": \"08:00\",\n  \"horaFin\": \"09:30\",\n  \"sala\": \"Sala 201\"\n}" }
+          }
+        },
+        {
+          "name": "Horarios por Curso",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/horarios/curso/1A",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Mis Horarios (DOCENTE)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/horarios/mis-horarios",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📊 Reportes (Redis Cache)",
+      "item": [
+        {
+          "name": "Reporte Estudiante (cache 15 min)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('Tiene promedio', () => pm.expect(r.promedioGeneral).to.be.a('number'));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reportes/estudiante/44444444-4",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Reporte Curso (cache 30 min)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reportes/curso/1A",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Limpiar Caché Redis (ADMIN)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 204', () => pm.response.to.have.status(204));"
+          ] } }],
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/reportes/cache",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    }
+
+  ]
+}

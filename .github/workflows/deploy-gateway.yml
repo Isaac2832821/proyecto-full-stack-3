@@ -1,0 +1,156 @@
+# ══════════════════════════════════════════════════════════════════
+# CI/CD Pipeline — Gateway (Eureka + API Gateway)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Trigger: push sobre la rama 'deploy' con cambios en gateway/eureka
+# Flujo:   Build imágenes → Push Docker Hub → Deploy EC2-Gateway
+# ══════════════════════════════════════════════════════════════════
+name: CI/CD — Gateway
+
+on:
+  push:
+    branches:
+      - deploy
+    paths:
+      - "eureka-server/**"
+      - "api-gateway/**"
+      - "docker-compose.ec2-gateway.yml"
+      - ".github/workflows/deploy-gateway.yml"
+
+env:
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Build y Push de imágenes Gateway
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - service: eureka-server
+            context: ./eureka-server
+            image_suffix: colegio-eureka-server
+          - service: api-gateway
+            context: ./api-gateway
+            image_suffix: colegio-api-gateway
+
+    steps:
+      - name: 📥 Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: 🔐 Login a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Generar metadata de imagen
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: ⚡ Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build y Push — ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Deploy en EC2-Gateway
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy en EC2-Gateway
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: 🔑 Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            us-east-1
+
+      - name: 🔍 Obtener Instance ID ec2-gateway
+        id: get-instance
+        run: |
+          ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=ec2-gateway" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          echo "instance_id=$ID" >> $GITHUB_OUTPUT
+          echo "Gateway instance: $ID"
+
+      - name: 🖥️ Deploy via SSM en EC2-Gateway
+        env:
+          DH_USER:     ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
+          JWT:         ${{ secrets.JWT_SECRET }}
+          REPO:        ${{ github.repository }}
+          INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os
+          dh_user  = os.environ['DH_USER']
+          dh_token = os.environ['DH_TOKEN']
+          jwt      = os.environ['JWT']
+          repo     = os.environ['REPO']
+          commands = [
+            "export PATH=$PATH:/usr/libexec/docker/cli-plugins:/usr/lib/docker/cli-plugins",
+            f"echo '{dh_token}' | docker login -u '{dh_user}' --password-stdin",
+            f"curl -fsSL 'https://raw.githubusercontent.com/{repo}/deploy/docker-compose.ec2-gateway.yml' -o /home/ec2-user/docker-compose.ec2-gateway.yml",
+            f"cd /home/ec2-user && DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' docker compose -f docker-compose.ec2-gateway.yml pull",
+            f"cd /home/ec2-user && DOCKERHUB_USERNAME='{dh_user}' JWT_SECRET='{jwt}' docker compose -f docker-compose.ec2-gateway.yml up -d --remove-orphans",
+            "cd /home/ec2-user && docker compose -f docker-compose.ec2-gateway.yml ps",
+            "docker image prune -f",
+          ]
+          with open("/tmp/ssm-gateway.json", "w") as f:
+              json.dump({"commands": commands}, f)
+          print("JSON generado OK")
+          PYEOF
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters file:///tmp/ssm-gateway.json \
+            --comment "Deploy gateway ${{ github.sha }}" \
+            --region us-east-1 \
+            --query "Command.CommandId" \
+            --output text)
+          echo "SSM Command ID: $COMMAND_ID"
+
+          # Esperar resultado (máx 5 min)
+          for i in $(seq 1 30); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region us-east-1 \
+              --query "StatusDetails" --output text 2>/dev/null || echo "Pending")
+            echo "⏳ ($i/30): $STATUS"
+            if [[ "$STATUS" == "Success" ]]; then
+              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --region us-east-1 --query "StandardOutputContent" --output text
+              exit 0
+            elif [[ "$STATUS" == *"Failed"* || "$STATUS" == "Cancelled" || "$STATUS" == *"TimedOut"* ]]; then
+              aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --region us-east-1 --query "StandardErrorContent" --output text
+              exit 1
+            fi
+          done
+          echo "⏰ Timeout SSM" && exit 1
