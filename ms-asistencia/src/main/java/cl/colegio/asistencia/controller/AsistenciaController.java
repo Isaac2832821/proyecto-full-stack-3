@@ -7,7 +7,6 @@ import cl.colegio.asistencia.service.AsistenciaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,11 +30,14 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/asistencia")
-@RequiredArgsConstructor
 @Tag(name = "Asistencia", description = "CRUD y resumen de asistencia escolar — regla 85% MINEDUC")
 public class AsistenciaController {
 
     private final AsistenciaService asistenciaService;
+    
+    public AsistenciaController(AsistenciaService asistenciaService) {
+        this.asistenciaService = asistenciaService;
+    }
 
     // ── Docente ───────────────────────────────────────────────────────────
 

@@ -1,9 +1,5 @@
 package cl.colegio.asistencia.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
  * Entidad que representa un registro de asistencia diaria de un estudiante.
