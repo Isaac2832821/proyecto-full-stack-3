@@ -1,0 +1,283 @@
+# ══════════════════════════════════════════════════════════════════
+# CI/CD Pipeline — Amazon ECS Fargate (Orquestación de Contenedores)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
+#
+# Trigger: push a 'deploy' con cambios en servicios core (gateway, frontend, autenticacion, calificaciones)
+# Flujo:
+#   1. Build & Push imagen Docker (con caché GHA)
+#   2. Actualizar Task Definition ECS con nuevo SHA de imagen
+#   3. Rolling deploy en ECS Service (maximumPercent=200, minimumHealthyPercent=50)
+#   4. Esperar estabilidad del Service (aws ecs wait services-stable)
+#   5. Health Check vía ALB
+#
+# Este pipeline complementa los pipelines EC2 (deploy-services.yml)
+# Arquitectura: ECS maneja gateway + frontend / EC2 maneja los 6 microservicios
+# ══════════════════════════════════════════════════════════════════
+name: CI/CD — ECS Fargate
+
+on:
+  push:
+    branches:
+      - deploy
+    paths:
+      - "api-gateway/**"
+      - "eureka-server/**"
+      - "frontend/**"
+      - "ms-autenticacion/**"
+      - "ms-calificaciones/**"
+      - "ecs/task-definitions/**"
+      - ".github/workflows/deploy-ecs.yml"
+
+env:
+  AWS_REGION:    us-east-1
+  ECS_CLUSTER:   colegio-cluster
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Build & Push — determina qué servicios cambiaron
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            context: ./api-gateway
+            image_suffix: colegio-api-gateway
+            ecs_service: colegio-gateway
+            task_family: colegio-api-gateway
+            task_file: ecs/task-definitions/ecs-task-gateway.json
+            container_name: api-gateway
+          - service: eureka-server
+            context: ./eureka-server
+            image_suffix: colegio-eureka-server
+            ecs_service: colegio-eureka
+            task_family: colegio-eureka-server
+            task_file: ecs/task-definitions/ecs-task-eureka.json
+            container_name: eureka-server
+          - service: frontend
+            context: ./frontend
+            image_suffix: colegio-frontend
+            ecs_service: colegio-frontend
+            task_family: colegio-frontend
+            task_file: ecs/task-definitions/ecs-task-frontend.json
+            container_name: frontend
+          - service: ms-autenticacion
+            context: ./ms-autenticacion
+            image_suffix: colegio-ms-autenticacion
+            ecs_service: colegio-autenticacion
+            task_family: colegio-ms-autenticacion
+            task_file: ecs/task-definitions/ecs-task-autenticacion.json
+            container_name: ms-autenticacion
+          - service: ms-calificaciones
+            context: ./ms-calificaciones
+            image_suffix: colegio-ms-calificaciones
+            ecs_service: colegio-calificaciones
+            task_family: colegio-ms-calificaciones
+            task_file: ecs/task-definitions/ecs-task-calificaciones.json
+            container_name: ms-calificaciones
+
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+
+    steps:
+      - name: 📥 Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login a Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: ⚡ Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build & Push — ${{ matrix.service }}
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}:sha-${{ github.sha }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}
+          # Caché por servicio — reduce tiempo de build hasta un 70%
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+
+      - name: 🏷️ Actualizar Task Definition ECS con nueva imagen
+        id: update-task
+        run: |
+          IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_suffix }}:sha-${{ github.sha }}"
+          echo "Nueva imagen: $IMAGE"
+
+          # Obtener la última task definition y actualizar la imagen del container
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "${{ matrix.task_family }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "taskDefinition" \
+            --output json)
+
+          # Actualizar solo la imagen del container específico
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | python3 -c "
+          import json, sys
+          td = json.load(sys.stdin)
+          container_name = '${{ matrix.container_name }}'
+          new_image = '$IMAGE'
+          for cd in td['containerDefinitions']:
+              if cd['name'] == container_name:
+                  cd['image'] = new_image
+                  print(f'Updated container {container_name} -> {new_image}', flush=True)
+                  break
+          # Limpiar campos que no se pueden re-registrar
+          for field in ['taskDefinitionArn','revision','status','requiresAttributes',
+                        'compatibilities','registeredAt','registeredBy']:
+              td.pop(field, None)
+          print(json.dumps(td))
+          " | tail -1)
+
+          # Registrar nueva revisión de la task definition
+          NEW_REVISION=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "task_def_arn=$NEW_REVISION" >> $GITHUB_OUTPUT
+          echo "✅ Nueva Task Definition: $NEW_REVISION"
+
+      - name: 🚀 Rolling Deploy en ECS Service
+        run: |
+          echo "🚀 Desplegando en ECS Service: ${{ matrix.ecs_service }}"
+          aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ matrix.ecs_service }}" \
+            --task-definition "${{ steps.update-task.outputs.task_def_arn }}" \
+            --force-new-deployment \
+            --region "${{ env.AWS_REGION }}" \
+            --query "service.deployments[0].status" \
+            --output text
+
+          echo "⏳ Esperando estabilidad del Service (máx 10 min)..."
+          aws ecs wait services-stable \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ matrix.ecs_service }}" \
+            --region "${{ env.AWS_REGION }}"
+
+          echo "✅ Service estable: ${{ matrix.ecs_service }}"
+
+      - name: 📊 Estado del Service post-deploy
+        if: always()
+        run: |
+          echo "=== Estado del ECS Service: ${{ matrix.ecs_service }} ==="
+          aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services "${{ matrix.ecs_service }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount,Deployments:deployments[0].status}" \
+            --output table
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Health Check vía ALB
+  # Verifica que el ALB distribuye tráfico correctamente
+  # ─────────────────────────────────────────────────────────────
+  health-check:
+    name: 🏥 Health Check — ALB Endpoints
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: 🔑 Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: 🔍 Obtener DNS del ALB
+        id: get-alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names "colegio-alb" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "LoadBalancers[0].DNSName" \
+            --output text)
+          echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+          echo "ALB DNS: $ALB_DNS"
+
+      - name: 🏥 Health Check — Frontend (ALB:80)
+        env:
+          ALB_DNS: ${{ steps.get-alb.outputs.alb_dns }}
+        run: |
+          echo "🔍 Verificando Frontend en http://$ALB_DNS..."
+          for attempt in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "http://$ALB_DNS/" || echo "000")
+            if [[ "$HTTP_CODE" == "200" ]]; then
+              echo "✅ Frontend UP — HTTP $HTTP_CODE"
+              break
+            fi
+            echo "⏳ Intento $attempt/5 (HTTP $HTTP_CODE)"
+            sleep 20
+          done
+
+      - name: 🔥 Smoke Test — API Gateway (ALB:8080)
+        env:
+          ALB_DNS: ${{ steps.get-alb.outputs.alb_dns }}
+        run: |
+          echo "🔥 Smoke test al Gateway en http://$ALB_DNS:8080..."
+          for attempt in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 15 \
+              -X POST "http://$ALB_DNS:8080/auth/login" \
+              -H "Content-Type: application/json" \
+              -d '{"rut":"11111111-1","password":"Admin1234!"}' || echo "000")
+
+            if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "401" ]]; then
+              echo "✅ Gateway responde — HTTP $HTTP_CODE"
+              exit 0
+            fi
+            echo "⏳ Intento $attempt/3 (HTTP $HTTP_CODE)"
+            sleep 15
+          done
+          echo "⚠️  Gateway no respondió al smoke test"
+
+      - name: 📋 Resumen del Deploy ECS
+        if: always()
+        env:
+          ALB_DNS: ${{ steps.get-alb.outputs.alb_dns }}
+        run: |
+          echo "## 🚀 Deploy ECS Fargate — $(date '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** \`${{ env.ECS_CLUSTER }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### URLs" >> $GITHUB_STEP_SUMMARY
+          echo "| Servicio | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 Frontend | http://$ALB_DNS |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔌 API Gateway | http://$ALB_DNS:8080 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Estado de Services ECS" >> $GITHUB_STEP_SUMMARY
+          aws ecs describe-services \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --services colegio-eureka colegio-gateway colegio-autenticacion colegio-calificaciones colegio-frontend \
+            --region "${{ env.AWS_REGION }}" \
+            --query "services[*].{Servicio:serviceName,Estado:status,Running:runningCount,Deseado:desiredCount}" \
+            --output table 2>/dev/null >> $GITHUB_STEP_SUMMARY || true

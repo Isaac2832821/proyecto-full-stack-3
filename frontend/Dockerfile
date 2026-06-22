@@ -18,10 +18,13 @@ RUN npm ci --prefer-offline
 # Copiar el código fuente
 COPY . .
 
-# URL del API Gateway — se inyecta como build arg en el pipeline CI/CD
+# URL del API Gateway y Firebase API Key — se inyectan como build args en el pipeline CI/CD
 # En desarrollo local el valor por defecto apunta a localhost
 ARG VITE_API_URL=http://localhost:8080
 ENV VITE_API_URL=$VITE_API_URL
+
+ARG VITE_FIREBASE_API_KEY
+ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
 
 # Build de producción — genera carpeta /app/dist
 RUN npm run build
