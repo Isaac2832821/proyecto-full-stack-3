@@ -281,3 +281,5 @@ jobs:
             --region "${{ env.AWS_REGION }}" \
             --query "services[*].{Servicio:serviceName,Estado:status,Running:runningCount,Deseado:desiredCount}" \
             --output table 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
+
+# Trigger ecs

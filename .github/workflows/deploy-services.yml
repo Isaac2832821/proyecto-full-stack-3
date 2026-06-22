@@ -284,3 +284,5 @@ jobs:
             echo "❌ Smoke test FALLÓ — Gateway no responde (HTTP $HTTP_CODE)"
             exit 1
           fi
+
+# Trigger services
