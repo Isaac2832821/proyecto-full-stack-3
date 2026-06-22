@@ -126,16 +126,16 @@ public class AsistenciaRepository {
         String estadoStr = doc.getString("estado");
         EstadoAsistencia estado = estadoStr != null ? EstadoAsistencia.valueOf(estadoStr) : null;
 
-        return Asistencia.builder()
-                .id(doc.getId())
-                .estudianteId(doc.getString("estudianteId"))
-                .estudianteNombre(doc.getString("estudianteNombre"))
-                .docenteId(doc.getString("docenteId"))
-                .asignaturaId(doc.getString("asignaturaId"))
-                .asignaturaNombre(doc.getString("asignaturaNombre"))
-                .fecha(doc.getString("fecha"))
-                .estado(estado)
-                .observacion(doc.getString("observacion"))
-                .build();
+        Asistencia a = new Asistencia();
+        a.setId(doc.getId());
+        a.setEstudianteId(doc.getString("estudianteId"));
+        a.setEstudianteNombre(doc.getString("estudianteNombre"));
+        a.setDocenteId(doc.getString("docenteId"));
+        a.setAsignaturaId(doc.getString("asignaturaId"));
+        a.setAsignaturaNombre(doc.getString("asignaturaNombre"));
+        a.setFecha(doc.getString("fecha"));
+        a.setEstado(estado);
+        a.setObservacion(doc.getString("observacion"));
+        return a;
     }
 }
