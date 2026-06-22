@@ -289,6 +289,25 @@
           }
         }
       ]
+    },
+
+    {
+      "name": "🌐 BFF (Backend For Frontend)",
+      "item": [
+        {
+          "name": "Dashboard Estudiante",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('Tiene resumen de asistencia', () => pm.expect(r.porcentajeAsistencia).to.exist);"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/bff/dashboard/44444444-4",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
     }
 
   ]

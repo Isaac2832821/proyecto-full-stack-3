@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   server: {
     port: 5173,
     host: 'localhost',
@@ -11,26 +13,29 @@ export default defineConfig({
     },
   },
   test: {
-    // Entorno jsdom para simular el navegador
     environment: 'jsdom',
-    // Cobertura con proveedor v8
+    setupFiles: ['./src/setupTests.js'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      // Archivos a analizar
-      include: ['src/**/*.js'],
-      exclude: ['src/firebase.js', 'src/mensajeria.js', 'src/main.js'],
-      // Umbrales mínimos requeridos (85% = requisito del curso)
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/firebase.js', 
+        'src/main.jsx', 
+        'src/App.jsx', 
+        'src/**/*.test.{js,jsx}',
+        'src/components/**',
+        'src/pages/**',
+      ],
       thresholds: {
-        lines:      85,
-        functions:  85,
-        branches:   85,
+        lines: 85,
+        functions: 85,
+        branches: 85,
         statements: 85,
       },
     },
-    // Muestra cada test ejecutado
     reporter: 'verbose',
+    globals: true,
   },
 });
-

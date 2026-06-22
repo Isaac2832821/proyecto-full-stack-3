@@ -279,7 +279,43 @@ services:
       retries: 5
       start_period: 60s
 
-  # ── 11. Frontend ───────────────────────────────────────────────────
+  # ── 11. ms-bff — Backend For Frontend ───────────────────────────
+  ms-bff:
+    build:
+      context: ./ms-bff
+      dockerfile: Dockerfile
+    image: colegio/ms-bff:latest
+    container_name: ms-bff
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - MS_AUTENTICACION_URL=http://ms-autenticacion:8081
+      - MS_CALIFICACIONES_URL=http://ms-calificaciones:8082
+      - MS_ASISTENCIA_URL=http://ms-asistencia:8083
+      - MS_NOTIFICACIONES_URL=http://ms-notificaciones:8084
+      - MS_HORARIOS_URL=http://ms-horarios:8085
+      - MS_REPORTES_URL=http://ms-reportes:8086
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      ms-autenticacion:
+        condition: service_started
+    networks:
+      - backend-net
+    volumes:
+      - bff-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── 12. Frontend ───────────────────────────────────────────────────
+
   frontend:
     build:
       context: ./frontend
@@ -297,6 +333,30 @@ services:
       - frontend-net
       - backend-net
 
+  # ── 13. ms-pagos ────────────────────────────────────────────────
+  ms-pagos:
+    build:
+      context: ./ms-pagos
+      dockerfile: Dockerfile
+    image: colegio/ms-pagos:latest
+    container_name: ms-pagos
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULTZONE:-http://eureka-server:8761/eureka}
+      - JWT_SECRET=${JWT_SECRET}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend-net
 networks:
   frontend-net:
     driver: bridge
@@ -324,3 +384,5 @@ volumes:
     name: colegio-redis-data
   rabbitmq-data:
     name: colegio-rabbitmq-data
+  bff-logs:
+    name: colegio-bff-logs

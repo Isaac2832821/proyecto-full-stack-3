@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers("/usuarios/mis-hijos").hasRole("APODERADO")
                         .requestMatchers("/usuarios/destinatarios").authenticated()
                         .requestMatchers("/usuarios/**").hasRole("ADMIN")
+                        .requestMatchers("/error").permitAll()
                         // ── Todo lo demás requiere autenticación ─────────────
                         .anyRequest().authenticated()
                 )

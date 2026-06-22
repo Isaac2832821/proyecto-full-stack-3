@@ -5,40 +5,41 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 
 :root {
-  --bg:#FFFFFF; --bg-deep:#F5F7FA;
-  --bg-card:#FFFFFF; --bg-card-hover:#F5F7FA;
-  --bg-sidebar:#FFFFFF; --bg-input:#F5F7FA;
-  --bg-hover:rgba(0,0,0,0.03); --bg-white:#FFFFFF;
-  --bg-warm:#F5F7FA; --bg-mint:#F5F7FA;
+  /* True Dark Mode Premium */
+  --bg:#0B1121; --bg-deep:#060B14;
+  --bg-card:rgba(30, 41, 59, 0.7); --bg-card-hover:rgba(40, 53, 75, 0.85);
+  --bg-sidebar:#0F172A; --bg-input:rgba(15, 23, 42, 0.6);
+  --bg-hover:rgba(255,255,255,0.05); --bg-white:#1E293B;
+  --bg-warm:#0F172A; --bg-mint:#0F172A;
 
-  --accent:#2563EB; --accent-hover:#1d4ed8; --accent-light:#4A90E2;
-  --accent-glow:rgba(37,99,235,0.12); --accent-soft:rgba(37,99,235,0.08);
-  --primary:#1F3A5F; --primary-soft:#162d4a; --primary-light:#4A90E2;
-  --gradient:linear-gradient(135deg,#1F3A5F 0%,#4A90E2 100%);
-  --gradient-text:linear-gradient(135deg,#1F3A5F 0%,#4A90E2 100%);
+  --accent:#3B82F6; --accent-hover:#2563EB; --accent-light:#60A5FA;
+  --accent-glow:rgba(59,130,246,0.25); --accent-soft:rgba(59,130,246,0.15);
+  --primary:#1E3A8A; --primary-soft:#172554; --primary-light:#818CF8;
+  --gradient:linear-gradient(135deg,#3B82F6 0%,#8B5CF6 100%);
+  --gradient-text:linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%);
 
-  --text:#1A1A1A; --text-secondary:#374151;
-  --text-muted:#6B7280; --text-dim:#9ca3af;
+  --text:#F8FAFC; --text-secondary:#E2E8F0;
+  --text-muted:#94A3B8; --text-dim:#64748B;
 
-  --border:#E5E7EB; --border-strong:#d1d5db;
-  --border-focus:rgba(37,99,235,0.45);
+  --border:rgba(255,255,255,0.1); --border-strong:rgba(255,255,255,0.2);
+  --border-focus:rgba(59,130,246,0.5);
 
-  --success:#16A34A; --success-bg:rgba(22,163,74,0.08);
-  --error:#DC2626; --error-bg:rgba(220,38,38,0.06);
-  --warning:#d97706; --warning-bg:rgba(217,119,6,0.06);
+  --success:#10B981; --success-bg:rgba(16,185,129,0.15);
+  --error:#EF4444; --error-bg:rgba(239,68,68,0.15);
+  --warning:#F59E0B; --warning-bg:rgba(245,158,11,0.15);
 
-  --radius:12px; --radius-sm:8px; --radius-xs:6px; --radius-pill:50px;
-  --shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.05);
-  --shadow-sm:0 1px 2px rgba(0,0,0,0.05);
-  --shadow-lg:0 4px 16px rgba(0,0,0,0.08);
-  --shadow-glow:0 0 0 3px rgba(37,99,235,0.12);
-  --shadow-glow-sm:0 0 0 2px rgba(37,99,235,0.1);
-  --transition:all 0.2s ease;
-  --transition-slow:all 0.3s ease;
+  --radius:16px; --radius-sm:10px; --radius-xs:6px; --radius-pill:50px;
+  --shadow:0 4px 6px -1px rgba(0,0,0,0.5),0 2px 4px -1px rgba(0,0,0,0.3);
+  --shadow-sm:0 1px 3px 0 rgba(0,0,0,0.4);
+  --shadow-lg:0 10px 25px -3px rgba(0,0,0,0.6), 0 4px 10px -2px rgba(0,0,0,0.4);
+  --shadow-glow:0 0 15px rgba(59,130,246,0.3);
+  --shadow-glow-sm:0 0 8px rgba(59,130,246,0.2);
+  --transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
   --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --font-mono:'JetBrains Mono','Fira Code',monospace;
-  --sidebar-width:260px;
+  --sidebar-width:280px;
 }
 
 html{font-size:16px;scroll-behavior:smooth}
@@ -141,10 +142,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 /* ── Forms ──────────────────────────────────────────────────────── */
 .login-card::before{display:none}
 .login-card__logo{text-align:center;margin-bottom:2.5rem}
+.login-card__logo img{width:72px;height:72px;object-fit:contain;margin-bottom:0.75rem}
 .login-card__logo h1{font-size:1.75rem;font-weight:800;letter-spacing:-0.04em;
-  color:#111827;line-height:1.2;margin-bottom:0.5rem}
+  color:var(--text);line-height:1.2;margin-bottom:0.5rem}
 .login-card__logo p{color:var(--text-muted);font-size:0.8125rem;
   font-family:var(--font-mono);letter-spacing:0.03em}
+
 
 .form-group{margin-bottom:1.375rem}
 .form-group label{display:block;font-size:0.6875rem;font-weight:600;
@@ -545,3 +548,49 @@ select option:disabled{color:#9ca3af}
 }
 @media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
 
+/* ── Utilities ───────────────────────────────────────────────────── */
+.text-success { color: var(--success) !important; }
+.text-error { color: var(--error) !important; }
+.text-primary { color: var(--accent-light) !important; }
+.text-muted { color: var(--text-muted) !important; }
+
+.status-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.status-success {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-error {
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.sidebar__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-estudiante {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.logo-default {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 6px;
+}

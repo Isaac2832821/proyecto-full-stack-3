@@ -13,9 +13,14 @@
 
     <modules>
         <module>eureka-server</module>
+        <module>api-gateway</module>
         <module>ms-autenticacion</module>
         <module>ms-calificaciones</module>
         <module>ms-asistencia</module>
-        <module>api-gateway</module>
+        <module>ms-horarios</module>
+        <module>ms-notificaciones</module>
+        <module>ms-reportes</module>
+        <module>ms-bff</module>
+        <module>ms-pagos</module>
     </modules>
 </project>

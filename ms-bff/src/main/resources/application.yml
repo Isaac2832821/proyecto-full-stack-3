@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: ms-bff
+
+# ── Servidor ─────────────────────────────────────────────────────────────
+server:
+  port: 8087
+
+# ── JWT (misma clave compartida para validar tokens) ─────────────────────
+jwt:
+  secret: ${JWT_SECRET:5A7234753778214125442A472D4B6150645367566B5970337336763979244226}
+
+# ── URLs internas de microservicios ───────────────────────────────────────
+# El BFF se comunica directamente con cada MS sin pasar por el Gateway
+microservices:
+  autenticacion: ${MS_AUTENTICACION_URL:http://localhost:8081}
+  calificaciones: ${MS_CALIFICACIONES_URL:http://localhost:8082}
+  asistencia: ${MS_ASISTENCIA_URL:http://localhost:8083}
+  notificaciones: ${MS_NOTIFICACIONES_URL:http://localhost:8084}
+  horarios: ${MS_HORARIOS_URL:http://localhost:8085}
+  reportes: ${MS_REPORTES_URL:http://localhost:8086}
+
+# ── Eureka Client ─────────────────────────────────────────────────────────
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# ── Swagger / OpenAPI ─────────────────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ── Logging ───────────────────────────────────────────────────────────────
+logging:
+  level:
+    cl.colegio: DEBUG
+
+# ── Actuator ──────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

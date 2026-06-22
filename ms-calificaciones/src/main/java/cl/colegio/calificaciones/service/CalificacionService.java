@@ -53,9 +53,13 @@ public class CalificacionService {
 
         var guardada = calificacionRepository.save(calificacion);
 
-        // Publicar evento asíncrono en RabbitMQ para ms-notificaciones
-        // La falla en mensajería NO interrumpe el guardado (ver NotificacionProducer)
-        notificacionProducer.publicarNuevaCalificacion(guardada, docenteId);
+        // Publicar evento asíncrono en RabbitMQ — fault-tolerant:
+        // si RabbitMQ no está disponible, la nota SE GUARDA IGUAL.
+        try {
+            notificacionProducer.publicarNuevaCalificacion(guardada, docenteId);
+        } catch (Exception e) {
+            log.error("Error al publicar evento en RabbitMQ (nota guardada igualmente): {}", e.getMessage());
+        }
 
         log.info("Calificación registrada: estudiante={} nota={}", request.estudianteId(), request.nota());
         return guardada;

@@ -53,6 +53,37 @@ spring:
           predicates:
             - Path=/asistencia/**
 
+        # — Notificaciones (ms-notificaciones) —
+        - id: ms-notificaciones
+          uri: lb://ms-notificaciones
+          predicates:
+            - Path=/notificaciones/**
+
+        # — Horarios (ms-horarios) —
+        - id: ms-horarios
+          uri: lb://ms-horarios
+          predicates:
+            - Path=/horarios/**
+
+        # — Reportes con caché Redis (ms-reportes) —
+        - id: ms-reportes
+          uri: lb://ms-reportes
+          predicates:
+            - Path=/reportes/**
+
+        # — BFF — Backend For Frontend (ms-bff) —
+        # Agrega datos de múltiples MS para el frontend en un solo request
+        - id: ms-bff
+          uri: lb://ms-bff
+          predicates:
+            - Path=/bff/**
+
+        # — Pagos y Matrículas (ms-pagos) —
+        - id: ms-pagos
+          uri: lb://ms-pagos
+          predicates:
+            - Path=/pagos/**
+
 # ── Servidor ──────────────────────────────────────────────────────────────
 server:
   port: 8080

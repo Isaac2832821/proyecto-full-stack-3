@@ -133,6 +133,20 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <!-- ── Fix compatibilidad maven-resources-plugin con Maven 3.9.9 ── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.2.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.sonatype.plexus</groupId>
+                        <artifactId>plexus-build-api</artifactId>
+                        <version>0.0.7</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+
             <!-- ── JaCoCo — cobertura de pruebas ────────────────────── -->
             <plugin>
                 <groupId>org.jacoco</groupId>

@@ -44,22 +44,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7);
-        final String rut = jwtService.extraerRut(jwt);
 
-        // Solo autenticar si hay un rut y aún no hay autenticación en el contexto
-        if (rut != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            var userDetails = usuarioDetailsService.loadUserByUsername(rut);
+        try {
+            final String rut = jwtService.extraerRut(jwt);
 
-            if (jwtService.esTokenValido(jwt, userDetails)) {
-                String rol = jwtService.extraerRol(jwt);
-                var authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + rol))
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            // Solo autenticar si hay un rut y aún no hay autenticación en el contexto
+            if (rut != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                var userDetails = usuarioDetailsService.loadUserByUsername(rut);
+
+                if (jwtService.esTokenValido(jwt, userDetails)) {
+                    String rol = jwtService.extraerRol(jwt);
+                    var authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + rol))
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // Token inválido, expirado, o con firma incorrecta.
+            // Se ignora para que Spring Security maneje el rechazo (401/403).
         }
 
         filterChain.doFilter(request, response);
