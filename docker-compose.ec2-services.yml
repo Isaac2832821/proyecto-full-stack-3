@@ -1,20 +1,70 @@
 # ══════════════════════════════════════════════════════════════════
-# docker-compose.ec2-services.yml — EC2-Services (Microservicios)
+# docker-compose.ec2-services.yml — EC2-Services (TODOS los Microservicios)
+# Colegio Bernardo O'Higgins — Sistema de Gestión Escolar
 #
-# Variables requeridas en /home/ec2-user/.env:
-#   DOCKERHUB_USERNAME=tu_usuario
-#   JWT_SECRET=tu_jwt_secret
-#   EUREKA_HOST=<IP-PRIVADA-DE-EC2-GATEWAY>   ← clave para comunicación entre instancias
+# Incluye: ms-autenticacion, ms-calificaciones, ms-asistencia,
+#          ms-notificaciones, ms-horarios, ms-reportes
+#          + Redis + RabbitMQ (infraestructura)
 #
-# Uso en EC2-Services:
+# Variables requeridas (pasadas como env en el pipeline):
+#   DOCKERHUB_USERNAME  — Usuario Docker Hub
+#   JWT_SECRET          — Clave secreta JWT (≥ 32 chars)
+#   EUREKA_HOST         — IP privada de ec2-gateway
+#   HOST_IP             — IP privada de esta instancia (para Eureka)
+#   RABBITMQ_USER       — Usuario RabbitMQ (default: guest)
+#   RABBITMQ_PASS       — Contraseña RabbitMQ (default: guest)
+#
+# Uso manual en EC2-Services:
 #   docker compose -f docker-compose.ec2-services.yml pull
 #   docker compose -f docker-compose.ec2-services.yml up -d
+#   docker compose -f docker-compose.ec2-services.yml ps
 # ══════════════════════════════════════════════════════════════════
 version: "3.9"
 
 services:
 
-  # ── ms-autenticacion ─────────────────────────────────────────────
+  # ── Infraestructura ───────────────────────────────────────────
+
+  # Redis — Caché de reportes estadísticos
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - services-net
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ — Mensajería asíncrona entre microservicios
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"    # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
+    networks:
+      - services-net
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Microservicios ────────────────────────────────────────────
+
+  # ms-autenticacion — Login, registro, JWT
   ms-autenticacion:
     image: ${DOCKERHUB_USERNAME}/colegio-ms-autenticacion:latest
     container_name: ms-autenticacion
@@ -26,7 +76,7 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
       - JWT_SECRET=${JWT_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
-      # Le dice a Eureka la IP real de esta instancia para que el Gateway pueda enrutarle
+      # Le dice a Eureka la IP real de esta instancia para enrutamiento
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
       - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
     networks:
@@ -35,7 +85,7 @@ services:
       - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
       - autenticacion-logs:/app/logs
 
-  # ── ms-calificaciones ────────────────────────────────────────────
+  # ms-calificaciones — CRUD de notas + producer RabbitMQ
   ms-calificaciones:
     image: ${DOCKERHUB_USERNAME}/colegio-ms-calificaciones:latest
     container_name: ms-calificaciones
@@ -48,6 +98,13 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
       - EUREKA_INSTANCE_PREFERIPADDRESS=true
       - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - services-net
     volumes:
@@ -60,7 +117,7 @@ services:
       retries: 5
       start_period: 60s
 
-  # ── ms-asistencia ────────────────────────────────────────────────
+  # ms-asistencia — Control de asistencia
   ms-asistencia:
     image: ${DOCKERHUB_USERNAME}/colegio-ms-asistencia:latest
     container_name: ms-asistencia
@@ -85,14 +142,114 @@ services:
       retries: 5
       start_period: 60s
 
+  # ms-notificaciones — Consumer RabbitMQ + notificaciones automáticas
+  ms-notificaciones:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-notificaciones:latest
+    container_name: ms-notificaciones
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-guest}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - services-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - notificaciones-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ms-horarios — Gestión de horarios de clases
+  ms-horarios:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-horarios:latest
+    container_name: ms-horarios
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/serviceAccountKey.json
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
+    networks:
+      - services-net
+    volumes:
+      - /home/ec2-user/secrets/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+      - horarios-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ms-reportes — Reportes estadísticos con caché Redis
+  ms-reportes:
+    image: ${DOCKERHUB_USERNAME}/colegio-ms-reportes:latest
+    container_name: ms-reportes
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://${EUREKA_HOST}:8761/eureka
+      - JWT_SECRET=${JWT_SECRET}
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - EUREKA_INSTANCE_IP_ADDRESS=${HOST_IP}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # URLs internas de los otros MS (dentro de la misma red Docker)
+      - MS_CALIFICACIONES_URL=http://ms-calificaciones:8082
+      - MS_ASISTENCIA_URL=http://ms-asistencia:8083
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - services-net
+    volumes:
+      - reportes-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 networks:
   services-net:
     driver: bridge
 
 volumes:
+  # Datos persistentes
+  redis-data:
+    name: colegio-redis-data
+  rabbitmq-data:
+    name: colegio-rabbitmq-data
+  # Logs por servicio
   autenticacion-logs:
     name: colegio-autenticacion-logs
   calificaciones-logs:
     name: colegio-calificaciones-logs
   asistencia-logs:
     name: colegio-asistencia-logs
+  notificaciones-logs:
+    name: colegio-notificaciones-logs
+  horarios-logs:
+    name: colegio-horarios-logs
+  reportes-logs:
+    name: colegio-reportes-logs
