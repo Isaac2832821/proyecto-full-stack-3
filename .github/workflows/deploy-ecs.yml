@@ -13,20 +13,20 @@
 # Este pipeline complementa los pipelines EC2 (deploy-services.yml)
 # Arquitectura: ECS maneja gateway + frontend / EC2 maneja los 6 microservicios
 # ══════════════════════════════════════════════════════════════════
-name: CI/CD — ECS Fargate
+# ══════════════════════════════════════════════════════════════════
+# ⚠️  WORKFLOW DESHABILITADO — Reemplazado por deploy-eks.yml
+# Este pipeline usaba ECS Fargate + Docker Hub.
+# El nuevo pipeline usa EKS + Amazon ECR.
+# Se mantiene como referencia histórica.
+# ══════════════════════════════════════════════════════════════════
+name: CI/CD — ECS Fargate [DESHABILITADO]
 
 on:
-  push:
-    branches:
-      - deploy
-    paths:
-      - "api-gateway/**"
-      - "eureka-server/**"
-      - "frontend/**"
-      - "ms-autenticacion/**"
-      - "ms-calificaciones/**"
-      - "ecs/task-definitions/**"
-      - ".github/workflows/deploy-ecs.yml"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Escribe CONFIRMAR para ejecutar este workflow legacy de ECS"
+        required: true
 
 env:
   AWS_REGION:    us-east-1
